@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 from os.path import join
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -121,18 +122,27 @@ WSGI_APPLICATION = 'shubik_shop.wsgi.application'
 #     }
 # }
 
+#DATABASES = {
+#    'default': {
+#        'ENGINE': 'django.db.backends.postgresql',
+#        'NAME': 'shubik',  # El nombre de tu base de datos
+#        'USER': 'postgres',
+#        'PASSWORD': '1234567890.a',
+#        'HOST': 'shubik.postgres.database.azure.com',
+#        'PORT': '5432',  # Puerto por defecto
+#        'OPTIONS': {
+#            'sslmode': 'require',  # Opcional, pero recomendado para mayor seguridad
+#        },
+#    }
+#}
+
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'shubik',  # El nombre de tu base de datos
-        'USER': 'postgres',
-        'PASSWORD': '1234567890.a',
-        'HOST': 'shubik.postgres.database.azure.com',
-        'PORT': '5432',  # Puerto por defecto
-        'OPTIONS': {
-            'sslmode': 'require',  # Opcional, pero recomendado para mayor seguridad
-        },
-    }
+    'default': dj_database_url.config(
+        default='postgres://postgres:1234567890.a@shubik.postgres.database.azure.com:5432/shubik',
+        conn_max_age=600,
+        ssl_require=True
+    )
 }
 
 
