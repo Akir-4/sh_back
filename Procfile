@@ -1,0 +1,1 @@
+web: gunicorn sh_back.wsgi --log-file -
