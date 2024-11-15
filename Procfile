@@ -1,1 +1,1 @@
-web: gunicorn sh_back.wsgi --log-file -
+web: gunicorn shubik_shop.wsgi --log-file -
