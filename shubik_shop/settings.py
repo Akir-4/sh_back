@@ -122,28 +122,28 @@ WSGI_APPLICATION = 'shubik_shop.wsgi.application'
 #     }
 # }
 
-#DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.postgresql',
-#        'NAME': 'shubik',  # El nombre de tu base de datos
-#        'USER': 'postgres',
-#        'PASSWORD': '1234567890.a',
-#        'HOST': 'shubik.postgres.database.azure.com',
-#        'PORT': '5432',  # Puerto por defecto
-#        'OPTIONS': {
-#            'sslmode': 'require',  # Opcional, pero recomendado para mayor seguridad
-#        },
-#    }
-#}
-
-
 DATABASES = {
-    'default': dj_database_url.config(
-        default='postgres://postgres:1234567890.a@shubik.postgres.database.azure.com:5432/shubik',
-        conn_max_age=600,
-        ssl_require=True
-    )
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'shubik',  # El nombre de tu base de datos
+        'USER': 'postgres',
+        'PASSWORD': '1234567890.a',
+        'HOST': 'shubik.postgres.database.azure.com',
+        'PORT': '5432',  # Puerto por defecto
+        'OPTIONS': {
+            'sslmode': 'require',  # Opcional, pero recomendado para mayor seguridad
+        },
+    }
 }
+
+
+#DATABASES = {
+#    'default': dj_database_url.config(
+#        default='postgres://postgres:1234567890.a@shubik.postgres.database.azure.com:5432/shubik',
+#        conn_max_age=600,
+#        ssl_require=True
+#    )
+#}
 
 
 
