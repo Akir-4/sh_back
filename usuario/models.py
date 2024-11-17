@@ -6,7 +6,6 @@ class Usuario(models.Model):
     ROL_CHOICES = [
         ('comprador', 'Comprador'),
         ('administrador', 'Administrador'),
-        ('gestor', 'Gestor'),
     ]
 
     usuario_id = models.AutoField(primary_key=True)
@@ -20,15 +19,14 @@ class Usuario(models.Model):
     telefono = models.CharField(max_length=100, null=True, blank=True)
     imagen = models.ImageField(upload_to='usuarios/fotos/', null=True, blank=True)
     rol = models.CharField(max_length=20, choices=ROL_CHOICES, default='comprador')
+    created_at = models.DateTimeField(auto_now_add=True)  # Fecha de creación
+    updated_at = models.DateTimeField(auto_now=True)  # Fecha de última actualización
 
     def __str__(self):
         return self.usuario
 
     def es_admin(self):
         return self.rol == 'administrador'
-
-    def es_gestor(self):
-        return self.rol == 'gestor'
 
     def es_comprador(self):
         return self.rol == 'comprador'
