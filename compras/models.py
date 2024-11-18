@@ -23,28 +23,35 @@ class Subasta(models.Model):
 
     @property
     def sub_terminada(self):
+        """Verifica si la subasta debe cerrarse automáticamente."""
         return self.estado == 'vigente' and timezone.now() > self.fecha_termino
 
     def finalizar_subasta(self):
+        """Lógica para finalizar la subasta y notificar al ganador si corresponde."""
         puja_ganadora = self.puja_set.order_by('-monto').first()
+
         if puja_ganadora:
             self.precio_final = puja_ganadora.monto * 1.10
             self.estado = "pendiente"
-            # Enviar notificación al ganador
+
             usuario_ganador = puja_ganadora.usuario_id
             if usuario_ganador and usuario_ganador.telefono:
                 self.enviar_notificacion_ganador(usuario_ganador.telefono)
         else:
             self.estado = "cerrada"
             self.precio_final = self.precio_inicial or 0
+
         super().save()
 
     def enviar_notificacion_ganador(self, telefono_ganador):
         """Envía una notificación de WhatsApp al ganador de la subasta."""
         client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-        mensaje = f"¡Hola! Felicidades, has ganado la subasta del producto '{self.producto_id.nombre}' con un precio final de ${self.precio_final} CLP. Ahora solo necesitas completar el pago. Ingresa a tu perfil para finalizar la compra. ¡Te felicitamos nuevamente!"
+        mensaje = (
+            f"¡Hola! Felicidades, has ganado la subasta del producto '{self.producto_id.nombre}' "
+            f"con un precio final de ${self.precio_final} CLP. Ahora solo necesitas completar el pago. "
+            f"Ingresa a tu perfil para finalizar la compra. ¡Te felicitamos nuevamente!"
+        )
 
-        
         try:
             message = client.messages.create(
                 from_=settings.TWILIO_WHATSAPP_NUMBER,
@@ -56,14 +63,11 @@ class Subasta(models.Model):
             print(f"Error al enviar la notificación de WhatsApp: {e}")
 
     def save(self, *args, **kwargs):
+        """Sobrescribe el método save para cerrar subastas automáticamente."""
         if self.sub_terminada:
             self.finalizar_subasta()
         super().save(*args, **kwargs)
 
-@receiver(post_save, sender=Subasta)
-def verificar_estado_subasta(sender, instance, **kwargs):
-    if instance.sub_terminada:
-        instance.finalizar_subasta()
 
 class Puja(models.Model):
     puja_id = models.AutoField(primary_key=True)
@@ -71,6 +75,12 @@ class Puja(models.Model):
     usuario_id = models.ForeignKey('usuario.Usuario', on_delete=models.CASCADE)
     monto = models.IntegerField()
     fecha = models.DateTimeField()
+
+    def save(self, *args, **kwargs):
+        if self.monto <= 0:
+            raise ValueError("El monto de la puja debe ser mayor a cero.")
+        super().save(*args, **kwargs)
+
 
 class Transaccion(models.Model):
     transaccion_id = models.AutoField(primary_key=True)
@@ -81,9 +91,19 @@ class Transaccion(models.Model):
     monto = models.IntegerField()
 
     def save(self, *args, **kwargs):
+        if self.monto <= 0:
+            raise ValueError("El monto de la transacción debe ser mayor a cero.")
         super().save(*args, **kwargs)
+
         if self.estado == "completado":
             subasta = self.puja_id.subasta_id
             if subasta.estado == 'pendiente':
                 subasta.estado = "cerrada"
                 subasta.save()
+
+
+@receiver(post_save, sender=Subasta)
+def verificar_estado_subasta(sender, instance, **kwargs):
+    """Lógica para manejar el cierre de subastas a través de señales."""
+    if instance.sub_terminada:
+        instance.finalizar_subasta()
