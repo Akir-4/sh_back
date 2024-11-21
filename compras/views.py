@@ -267,7 +267,11 @@ def estadisticas_gerente(request):
                     subasta.fecha_termino = timezone.now()  # Puedes actualizar la fecha de término a la actual
                     subasta.save()
 
-                return Response({"message": "Pago completado con éxito"}, status=status.HTTP_200_OK)
+                    # Eliminar el producto asociado a la subasta, ya que la transacción fue completada
+                    producto = subasta.producto_id
+                    producto.delete()
+
+                return Response({"message": "Pago completado con éxito, producto eliminado"}, status=status.HTTP_200_OK)
             else:
                 return Response({"error": "El pago no fue autorizado"}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -275,6 +279,7 @@ def estadisticas_gerente(request):
             return Response({'error': 'Transacción no encontrada'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': f'Error al confirmar el pago: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     @action(detail=False, methods=['get'], url_path='ganadas-usuario/(?P<usuario_id>[^/.]+)')
     def get_subastas_ganadas_por_usuario(self, request, usuario_id):
