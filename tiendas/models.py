@@ -2,10 +2,6 @@ from django.db import models
 from django.core.exceptions import ValidationError
 import re
 
-from django.db import models
-from django.core.exceptions import ValidationError
-import re
-
 class Tienda(models.Model):
     """Modelo para representar una tienda o empresa."""
 
