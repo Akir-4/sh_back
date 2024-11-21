@@ -78,11 +78,11 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='estadisticas')
     def get_estadisticas(self, request):
-        # Obtener parámetros `month` y `year` de los query params
+        # Obtener parámetros month y year de los query params
         month = request.query_params.get("month")
         year = request.query_params.get("year")
 
-        # Validar los parámetros `month` y `year`
+        # Validar los parámetros month y year
         try:
             month = int(month) if month else timezone.now().month
             year = int(year) if year else timezone.now().year
@@ -98,16 +98,6 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
         except Exception as e:
             return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Subastas realizadas hoy
-        subastas_hoy = Subasta.objects.filter(
-            fecha_inicio__date=timezone.now().date()
-        ).count()
-
-        # Subastas que terminan hoy
-        subastas_terminan_hoy = Subasta.objects.filter(
-            fecha_termino__date=timezone.now().date()
-        ).count()
 
         # Subastas activas en el mes y año seleccionados
         subastas_mes = Subasta.objects.filter(
@@ -162,8 +152,6 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
         # Construir la respuesta
         response = {
-            "subastas_hoy": subastas_hoy,
-            "subastas_terminan_hoy": subastas_terminan_hoy,
             "subastas_mes": subastas_mes,
             "tienda_mas_subastas": tienda_mas_subastas.get("tienda_id__nombre_legal") if tienda_mas_subastas else "N/A",
             "ingresos_totales": ingresos_totales,
@@ -173,6 +161,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
 
     @action(detail=True, methods=['post'])
     def finalizar(self, request, pk=None):
