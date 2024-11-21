@@ -18,6 +18,7 @@ from usuario.models import Usuario
 from rest_framework.decorators import api_view
 from datetime import date
 from django.db.models import Sum, Count, Q
+from usuario.serializers import UsuarioSerializer
 
 class SubastaViewSet(viewsets.ModelViewSet):
     serializer_class = SubastaSerializer
@@ -161,6 +162,37 @@ class SubastaViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['get'], url_path='usuarios-registrados-hoy')
+    def get_usuarios_registrados_hoy(self, request):
+        """
+        Endpoint para obtener los usuarios registrados el día de hoy.
+        """
+        try:
+            # Calcular el rango de fechas del día actual
+            hoy = make_aware(datetime.now())
+            inicio_dia = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+            fin_dia = hoy.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            # Filtrar los usuarios registrados hoy
+            usuarios_hoy = Usuario.objects.filter(created_at__gte=inicio_dia, created_at__lte=fin_dia)
+
+            # Serializar los datos
+            serializer = UsuarioSerializer(usuarios_hoy, many=True)
+
+            # Construir la respuesta
+            response = {
+                "usuarios_registrados_hoy": serializer.data,
+                "total": usuarios_hoy.count(),
+            }
+
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cargar los usuarios registrados hoy: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     @action(detail=False, methods=['get'], url_path='estadisticas-diarias')
     def get_estadisticas_diarias(self, request):
