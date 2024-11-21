@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from .models import Usuario  # Asegúrate de que el modelo File esté importado
 from .serializers import UsuarioSerializer
 from .utils import upload_image_to_blob  # Importa la función para subir imágenes
-
+from datetime import date
 # Configurar logging
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,21 @@ class UsuarioViewSet(viewsets.ModelViewSet):
             logger.warning("No se proporcionó imagen, guardando usuario sin imagen.")
             serializer.save()  # Si no hay imagen, guarda el usuario sin la imagen
 
+@api_view(['GET'])
+def usuarios_registrados_hoy(request):
+    """
+    Endpoint para obtener los usuarios registrados el día de hoy.
+    """
+    try:
+        hoy = date.today()
+        usuarios_hoy = Usuario.objects.filter(created_at__date=hoy)  # Filtramos por la fecha de creación
+        serializer = UsuarioSerializer(usuarios_hoy, many=True)
+        logger.info("Usuarios registrados hoy cargados exitosamente.")
+        return Response(serializer.data, status=200)
+    except Exception as e:
+        logger.error(f"Error al cargar los usuarios registrados hoy: {str(e)}")
+        return Response({"error": "No se pudieron cargar los usuarios registrados hoy."}, status=500)
+    
 @api_view(['POST'])
 def upload_image(request):
     if request.method == 'POST':
