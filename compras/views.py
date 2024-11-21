@@ -109,51 +109,51 @@ class SubastaViewSet(viewsets.ModelViewSet):
         return Response(data)
 
 
-@api_view(["GET"])
-def estadisticas_gerente(request):
-    hoy = date.today()
-    primer_dia_mes = hoy.replace(day=1)
+    @api_view(["GET"])
+    def estadisticas_gerente(request):
+        hoy = date.today()
+        primer_dia_mes = hoy.replace(day=1)
 
-    # Ingresos totales del mes
-    ingresos_totales = Subasta.objects.filter(
-        estado="cerrada", fecha_termino__gte=primer_dia_mes, fecha_termino__lte=hoy
-    ).aggregate(total=Sum('precio_final'))["total"] or 0
+        # Ingresos totales del mes
+        ingresos_totales = Subasta.objects.filter(
+            estado="cerrada", fecha_termino__gte=primer_dia_mes, fecha_termino__lte=hoy
+        ).aggregate(total=Sum('precio_final'))["total"] or 0
 
-    # Usuarios activos este mes
-    usuarios_activos = Usuario.objects.filter(
-        Q(puja__fecha__gte=primer_dia_mes) | Q(subastas_ganadas__fecha_termino__gte=primer_dia_mes)
-    ).distinct().count()
+        # Usuarios activos este mes
+        usuarios_activos = Usuario.objects.filter(
+            Q(puja__fecha__gte=primer_dia_mes) | Q(subastas_ganadas__fecha_termino__gte=primer_dia_mes)
+        ).distinct().count()
 
-    # Tienda más activa del mes
-    tienda_mas_activa = (
-        Tienda.objects.annotate(
-            total_subastas=Count("subastas", filter=Q(subastas__fecha_termino__gte=primer_dia_mes))
+        # Tienda más activa del mes
+        tienda_mas_activa = (
+            Tienda.objects.annotate(
+                total_subastas=Count("subastas", filter=Q(subastas__fecha_termino__gte=primer_dia_mes))
+            )
+            .order_by("-total_subastas")
+            .values("nombre")
+            .first()
         )
-        .order_by("-total_subastas")
-        .values("nombre")
-        .first()
-    )
-    tienda_mas_activa_nombre = tienda_mas_activa["nombre"] if tienda_mas_activa else "N/A"
+        tienda_mas_activa_nombre = tienda_mas_activa["nombre"] if tienda_mas_activa else "N/A"
 
-    # Crecimiento mensual de usuarios
-    usuarios_mes = Usuario.objects.filter(created_at__gte=primer_dia_mes).count()
-    usuarios_mes_anterior = Usuario.objects.filter(
-        created_at__gte=primer_dia_mes - timedelta(days=30), created_at__lt=primer_dia_mes
-    ).count()
+        # Crecimiento mensual de usuarios
+        usuarios_mes = Usuario.objects.filter(created_at__gte=primer_dia_mes).count()
+        usuarios_mes_anterior = Usuario.objects.filter(
+            created_at__gte=primer_dia_mes - timedelta(days=30), created_at__lt=primer_dia_mes
+        ).count()
 
-    crecimiento = (
-        ((usuarios_mes - usuarios_mes_anterior) / usuarios_mes_anterior) * 100
-        if usuarios_mes_anterior > 0
-        else 0
-    )
+        crecimiento = (
+            ((usuarios_mes - usuarios_mes_anterior) / usuarios_mes_anterior) * 100
+            if usuarios_mes_anterior > 0
+            else 0
+        )
 
-    data = {
-        "ingresos_totales": ingresos_totales,
-        "usuarios_activos": usuarios_activos,
-        "tienda_mas_activa": tienda_mas_activa_nombre,
-        "crecimiento_usuarios": crecimiento,
-    }
-    return Response(data)
+        data = {
+            "ingresos_totales": ingresos_totales,
+            "usuarios_activos": usuarios_activos,
+            "tienda_mas_activa": tienda_mas_activa_nombre,
+            "crecimiento_usuarios": crecimiento,
+        }
+        
 
 
     @action(detail=True, methods=['post'])
