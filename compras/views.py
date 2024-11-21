@@ -196,7 +196,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         
-    @action(detail=False, methods=['get'], url_path='tiendas-registradas-hoy')
+    @action(detail=False, methods=['get'], url_path='tiendas-hoy')
     def get_tiendas_registradas_hoy(self, request):
         """
         Endpoint para obtener las tiendas registradas el día de hoy.
