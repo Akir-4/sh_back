@@ -15,10 +15,12 @@ from django.utils.timezone import make_aware
 from datetime import datetime, timedelta
 from django.db import models
 from usuario.models import Usuario
+from tiendas.models import Tienda 
 from rest_framework.decorators import api_view
 from datetime import date
 from django.db.models import Sum, Count, Q
 from usuario.serializers import UsuarioSerializer
+from tiendas.serializers import TiendaSerializer 
 
 class SubastaViewSet(viewsets.ModelViewSet):
     serializer_class = SubastaSerializer
@@ -191,6 +193,37 @@ class SubastaViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response(
                 {"error": f"Error al cargar los usuarios registrados hoy: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        
+    @action(detail=False, methods=['get'], url_path='tiendas-registradas-hoy')
+    def get_tiendas_registradas_hoy(self, request):
+        """
+        Endpoint para obtener las tiendas registradas el día de hoy.
+        """
+        try:
+            # Calcular el rango de fechas del día actual
+            hoy = make_aware(datetime.now())
+            inicio_dia = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+            fin_dia = hoy.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            # Filtrar las tiendas registradas hoy
+            tiendas_hoy = Tienda.objects.filter(created_at__gte=inicio_dia, created_at__lte=fin_dia)
+
+            # Serializar los datos
+            serializer = TiendaSerializer(tiendas_hoy, many=True)
+
+            # Construir la respuesta
+            response = {
+                "tiendas_registradas_hoy": serializer.data,
+                "total": tiendas_hoy.count(),
+            }
+
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cargar las tiendas registradas hoy: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
