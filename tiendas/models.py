@@ -2,6 +2,10 @@ from django.db import models
 from django.core.exceptions import ValidationError
 import re
 
+from django.db import models
+from django.core.exceptions import ValidationError
+import re
+
 class Tienda(models.Model):
     """Modelo para representar una tienda o empresa."""
 
@@ -16,6 +20,8 @@ class Tienda(models.Model):
     logo = models.ImageField(upload_to='usuarios/fotos/', null=True, blank=True)
     region = models.CharField(max_length=100, null=True, blank=True)
     comuna = models.CharField(max_length=100, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)  # Fecha de creación
+    updated_at = models.DateTimeField(auto_now=True)      # Fecha de última actualización
 
     def __str__(self):
         return self.nombre_legal
