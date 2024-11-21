@@ -162,6 +162,40 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
         return Response(response, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['get'], url_path='estadisticas-diarias')
+    def get_estadisticas_diarias(self, request):
+        # Fecha de hoy
+        today = timezone.now().date()
+
+        # Subastas realizadas hoy
+        subastas_hoy = Subasta.objects.filter(
+            fecha_inicio__date=today
+        ).count()
+
+        # Subastas que terminan hoy
+        subastas_terminan_hoy = Subasta.objects.filter(
+            fecha_termino__date=today
+        ).count()
+
+        # Usuarios registrados hoy
+        usuarios_registrados_hoy = Usuario.objects.filter(
+            created_at__date=today
+        ).count()
+
+        # Tiendas registradas hoy
+        tiendas_registradas_hoy = Tienda.objects.filter(
+            created_at__date=today
+        ).count()
+
+        # Construir la respuesta
+        response = {
+            "subastas_hoy": subastas_hoy,
+            "subastas_terminan_hoy": subastas_terminan_hoy,
+            "usuarios_registrados_hoy": usuarios_registrados_hoy,
+            "tiendas_registradas_hoy": tiendas_registradas_hoy,
+        }
+
+        return Response(response, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'])
     def finalizar(self, request, pk=None):
