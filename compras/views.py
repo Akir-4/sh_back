@@ -76,84 +76,27 @@ class SubastaViewSet(viewsets.ModelViewSet):
             instance.finalizar_subasta()
         return super().retrieve(request, *args, **kwargs)
 
-    @api_view(["GET"])
-    def estadisticas_administrador(request):
-        hoy = date.today()
+    
+    # Filtrar subastas que comenzaron o terminarán en un mes específico
+        month = self.request.query_params.get('month', None)
+        year = self.request.query_params.get('year', None)
+        if month and year:
+            try:
+                month = int(month)
+                year = int(year)
+                start_date = make_aware(datetime(year, month, 1))
+                if month == 12:
+                    end_date = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
+                else:
+                    end_date = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+                queryset = queryset.filter(
+                    models.Q(fecha_inicio__gte=start_date, fecha_inicio__lte=end_date) |
+                    models.Q(fecha_termino__gte=start_date, fecha_termino__lte=end_date)
+                )
+            except ValueError:
+                queryset = queryset.none()
 
-        # Subastas activas hoy
-        subastas_activas = Subasta.objects.filter(
-            Q(fecha_inicio__lte=hoy) & Q(fecha_termino__gte=hoy)
-        ).count()
-
-        # Subastas que terminan hoy
-        subastas_terminan_hoy = Subasta.objects.filter(fecha_termino__date=hoy).count()
-
-        # Usuarios registrados hoy
-        usuarios_registrados_hoy = Usuario.objects.filter(created_at__date=hoy).count()
-
-        # Subastas sin pujas
-        subastas_sin_pujas = Subasta.objects.annotate(
-            total_pujas=Count('puja_set')
-        ).filter(total_pujas=0).count()
-
-        # Subastas pendientes de pago
-        subastas_pendientes_pago = Subasta.objects.filter(estado="pendiente").count()
-
-        data = {
-            "subastas_activas": subastas_activas,
-            "subastas_terminan_hoy": subastas_terminan_hoy,
-            "usuarios_registrados_hoy": usuarios_registrados_hoy,
-            "subastas_sin_pujas": subastas_sin_pujas,
-            "subastas_pendientes_pago": subastas_pendientes_pago,
-        }
-        return Response(data)
-
-
-    @api_view(["GET"])
-    def estadisticas_gerente(request):
-        hoy = date.today()
-        primer_dia_mes = hoy.replace(day=1)
-
-        # Ingresos totales del mes
-        ingresos_totales = Subasta.objects.filter(
-            estado="cerrada", fecha_termino__gte=primer_dia_mes, fecha_termino__lte=hoy
-        ).aggregate(total=Sum('precio_final'))["total"] or 0
-
-        # Usuarios activos este mes
-        usuarios_activos = Usuario.objects.filter(
-            Q(puja__fecha__gte=primer_dia_mes) | Q(subastas_ganadas__fecha_termino__gte=primer_dia_mes)
-        ).distinct().count()
-
-        # Tienda más activa del mes
-        tienda_mas_activa = (
-            Tienda.objects.annotate(
-                total_subastas=Count("subastas", filter=Q(subastas__fecha_termino__gte=primer_dia_mes))
-            )
-            .order_by("-total_subastas")
-            .values("nombre")
-            .first()
-        )
-        tienda_mas_activa_nombre = tienda_mas_activa["nombre"] if tienda_mas_activa else "N/A"
-
-        # Crecimiento mensual de usuarios
-        usuarios_mes = Usuario.objects.filter(created_at__gte=primer_dia_mes).count()
-        usuarios_mes_anterior = Usuario.objects.filter(
-            created_at__gte=primer_dia_mes - timedelta(days=30), created_at__lt=primer_dia_mes
-        ).count()
-
-        crecimiento = (
-            ((usuarios_mes - usuarios_mes_anterior) / usuarios_mes_anterior) * 100
-            if usuarios_mes_anterior > 0
-            else 0
-        )
-
-        data = {
-            "ingresos_totales": ingresos_totales,
-            "usuarios_activos": usuarios_activos,
-            "tienda_mas_activa": tienda_mas_activa_nombre,
-            "crecimiento_usuarios": crecimiento,
-        }
-        
+        return queryset     
 
 
     @action(detail=True, methods=['post'])
@@ -287,6 +230,99 @@ class SubastaViewSet(viewsets.ModelViewSet):
         subastas_ganadas = Subasta.objects.filter(puja_set__usuario_id=usuario_id, estado='pendiente').distinct()
         serializer = SubastaSerializer(subastas_ganadas, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='estadisticas_gerente')
+    def get_estadisticas_gerente(self, request):
+        # Obtener parámetros `month` y `year` de los query params
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
+
+        # Validar los parámetros `month` y `year`
+        try:
+            month = int(month) if month else timezone.now().month
+            year = int(year) if year else timezone.now().year
+        except ValueError:
+            return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Calcular el rango de fechas del mes y año seleccionados
+        try:
+            inicio_mes = make_aware(datetime(year, month, 1))
+            if month == 12:
+                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
+            else:
+                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+        except Exception as e:
+            return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Consultas estratégicas
+
+        # Ingresos totales del mes
+        ingresos_totales = Subasta.objects.filter(
+            estado="cerrada",
+            fecha_termino__gte=inicio_mes,
+            fecha_termino__lte=fin_mes,
+        ).aggregate(total=Sum("precio_final"))["total"] or 0
+
+        # Tasa de conversión de subastas
+        subastas_cerradas = Subasta.objects.filter(
+            estado="cerrada",
+            fecha_termino__gte=inicio_mes,
+            fecha_termino__lte=fin_mes,
+        ).count()
+        subastas_activas = Subasta.objects.filter(
+            fecha_inicio__gte=inicio_mes,
+            fecha_inicio__lte=fin_mes,
+        ).count()
+        tasa_conversion = (
+            (subastas_cerradas / subastas_activas) * 100 if subastas_activas > 0 else 0
+        )
+
+        # Ingresos promedio por subasta
+        ingresos_promedio = (
+            ingresos_totales / subastas_cerradas if subastas_cerradas > 0 else 0
+        )
+
+        # Participación promedio por subasta
+        pujas_mes = Puja.objects.filter(
+            fecha__gte=inicio_mes,
+            fecha__lte=fin_mes,
+        ).count()
+        participacion_promedio = (
+            pujas_mes / subastas_activas if subastas_activas > 0 else 0
+        )
+
+        # Tienda con más subastas
+        tienda_mas_activa = (
+            Subasta.objects.filter(fecha_inicio__gte=inicio_mes, fecha_inicio__lte=fin_mes)
+            .values("tienda_id__nombre_legal")
+            .annotate(total_subastas=Count("subasta_id"))
+            .order_by("-total_subastas")
+            .first()
+        )
+        tienda_mas_activa_nombre = tienda_mas_activa["tienda_id__nombre_legal"] if tienda_mas_activa else "N/A"
+
+        # Crecimiento de usuarios
+        usuarios_mes_actual = Usuario.objects.filter(created_at__gte=inicio_mes, created_at__lte=fin_mes).count()
+        inicio_mes_anterior = inicio_mes - timedelta(days=30)
+        fin_mes_anterior = inicio_mes - timedelta(seconds=1)
+        usuarios_mes_anterior = Usuario.objects.filter(created_at__gte=inicio_mes_anterior, created_at__lte=fin_mes_anterior).count()
+        crecimiento_usuarios = (
+            ((usuarios_mes_actual - usuarios_mes_anterior) / usuarios_mes_anterior) * 100
+            if usuarios_mes_anterior > 0
+            else 0
+        )
+
+        # Respuesta para el gerente
+        response = {
+            "ingresos_totales": ingresos_totales,
+            "tasa_conversion": round(tasa_conversion, 2),
+            "ingresos_promedio": round(ingresos_promedio, 2),
+            "participacion_promedio": round(participacion_promedio, 2),
+            "tienda_mas_activa": tienda_mas_activa_nombre,
+            "crecimiento_usuarios": round(crecimiento_usuarios, 2),
+        }
+
+        return Response(response, status=status.HTTP_200_OK)
 
 class PujaViewSet(viewsets.ModelViewSet):
     queryset = Puja.objects.all()
