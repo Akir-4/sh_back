@@ -226,7 +226,68 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 {"error": f"Error al cargar las tiendas registradas hoy: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+    @action(detail=False, methods=['get'], url_path='subastas-iniciadas-hoy')
+    def get_subastas_iniciadas_hoy(self, request):
+        """
+        Endpoint para obtener las subastas que se iniciaron hoy.
+        """
+        try:
+            # Calcular el rango de fechas del día actual
+            hoy = make_aware(datetime.now())
+            inicio_dia = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+            fin_dia = hoy.replace(hour=23, minute=59, second=59, microsecond=999999)
 
+            # Filtrar las subastas iniciadas hoy
+            subastas_hoy = Subasta.objects.filter(fecha_inicio__gte=inicio_dia, fecha_inicio__lte=fin_dia)
+
+            # Serializar los datos
+            serializer = SubastaSerializer(subastas_hoy, many=True)
+
+            # Construir la respuesta
+            response = {
+                "subastas_iniciadas_hoy": serializer.data,
+                "total": subastas_hoy.count(),
+            }
+
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cargar las subastas iniciadas hoy: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @action(detail=False, methods=['get'], url_path='subastas-terminan-hoy')
+    def get_subastas_terminan_hoy(self, request):
+        """
+        Endpoint para obtener las subastas que terminan hoy.
+        """
+        try:
+            # Calcular el rango de fechas del día actual
+            hoy = make_aware(datetime.now())
+            inicio_dia = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+            fin_dia = hoy.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            # Filtrar las subastas que terminan hoy
+            subastas_terminan_hoy = Subasta.objects.filter(fecha_termino__gte=inicio_dia, fecha_termino__lte=fin_dia)
+
+            # Serializar los datos
+            serializer = SubastaSerializer(subastas_terminan_hoy, many=True)
+
+            # Construir la respuesta
+            response = {
+                "subastas_terminan_hoy": serializer.data,
+                "total": subastas_terminan_hoy.count(),
+            }
+
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cargar las subastas que terminan hoy: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        
     @action(detail=False, methods=['get'], url_path='estadisticas-diarias')
     def get_estadisticas_diarias(self, request):
         # Fecha de hoy
