@@ -4,7 +4,7 @@ from .models import Usuario
 class UsuarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
-        fields = ['usuario_id', 'nombre', 'usuario', 'contrasena', 'email', 'direccion', 'telefono', 'imagen', 'rol','region','comuna']
+        fields = ['usuario_id', 'nombre', 'usuario', 'contrasena', 'email', 'direccion', 'telefono', 'imagen', 'rol','region','comuna','created_at']
         extra_kwargs = {
             'contrasena': {'write_only': True} # Para que la contraseña solo se pueda escribir, no leer
         }
