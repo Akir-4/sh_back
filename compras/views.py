@@ -326,46 +326,102 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='estadisticas-tienda')
     def get_estadisticas_tienda(self, request):
-            """
-            Endpoint para obtener estadísticas relacionadas con las tiendas.
-            """
-            # Ingresos por tienda
-            ingresos_por_tienda = (
-                Subasta.objects.filter(estado="cerrada")
-                .values("tienda_id__nombre_legal")
-                .annotate(ingresos=Sum("precio_final"))
-                .order_by("-ingresos")
+        """
+        Endpoint para obtener estadísticas relacionadas con las tiendas.
+        """
+        # Obtener parámetros month y year de los query params
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
+
+        # Validar los parámetros month y year
+        try:
+            month = int(month) if month else timezone.now().month
+            year = int(year) if year else timezone.now().year
+        except ValueError:
+            return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Calcular el rango de fechas del mes y año seleccionados
+        try:
+            inicio_mes = make_aware(datetime(year, month, 1))
+            if month == 12:
+                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
+            else:
+                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+        except Exception as e:
+            return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ingresos por tienda en el mes y año seleccionados
+        ingresos_por_tienda = (
+            Subasta.objects.filter(
+                estado="cerrada",
+                fecha_termino__gte=inicio_mes,
+                fecha_termino__lte=fin_mes
             )
+            .values("tienda_id__nombre_legal")
+            .annotate(ingresos=Sum("precio_final"))
+            .order_by("-ingresos")
+        )
 
-            # Tienda con más subastas realizadas
-            tienda_mas_subastas = (
-                Subasta.objects.values("tienda_id__nombre_legal")
-                .annotate(total_subastas=Count("subasta_id"))
-                .order_by("-total_subastas")
-                .first()
+        # Tienda con más subastas realizadas en el mes y año seleccionados
+        tienda_mas_subastas = (
+            Subasta.objects.filter(
+                fecha_inicio__gte=inicio_mes,
+                fecha_inicio__lte=fin_mes
             )
+            .values("tienda_id__nombre_legal")
+            .annotate(total_subastas=Count("subasta_id"))
+            .order_by("-total_subastas")
+            .first()
+        )
 
-            response = {
-                "ingresos_por_tienda": list(ingresos_por_tienda),
-                "tienda_mas_subastas": tienda_mas_subastas.get("tienda_id__nombre_legal") if tienda_mas_subastas else "N/A",
-            }
+        response = {
+            "ingresos_por_tienda": list(ingresos_por_tienda),
+            "tienda_mas_subastas": tienda_mas_subastas.get("tienda_id__nombre_legal") if tienda_mas_subastas else "N/A",
+        }
 
-            return Response(response, status=status.HTTP_200_OK)
+        return Response(response, status=status.HTTP_200_OK)
+
 
     @action(detail=False, methods=['get'], url_path='estadisticas-usuario')
-    def get_estadisticas_usuario(self, request):
-        """
-        Endpoint para obtener estadísticas relacionadas con los usuarios.
-        """
-        # Usuarios registrados este mes
-        month = request.query_params.get("month", timezone.now().month)
-        year = request.query_params.get("year", timezone.now().year)
-        inicio_mes = make_aware(datetime(year=int(year), month=int(month), day=1))
-        fin_mes = inicio_mes + timedelta(days=30)
+    def get_estadisticas_usuarios(self, request):
+        # Obtener parámetros month y year de los query params
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
 
-        usuarios_registrados = Usuario.objects.filter(created_at__gte=inicio_mes, created_at__lte=fin_mes).count()
+        # Validar los parámetros month y year
+        try:
+            month = int(month) if month else timezone.now().month
+            year = int(year) if year else timezone.now().year
+        except ValueError:
+            return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Usuario con más subastas ganadas este mes
+        # Calcular el rango de fechas del mes y año seleccionados
+        try:
+            inicio_mes = make_aware(datetime(year, month, 1))
+            if month == 12:
+                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
+            else:
+                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+        except Exception as e:
+            return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Usuarios registrados en el mes y año seleccionados
+        usuarios_registrados = Usuario.objects.filter(
+            created_at__gte=inicio_mes,
+            created_at__lte=fin_mes
+        ).count()
+
+        # Usuarios activos: aquellos que han ganado al menos una subasta (tienen transacción completada)
+        usuarios_activos = Usuario.objects.filter(
+            Q(puja__subasta_id__estado='cerrada') & Q(puja__subasta_id__fecha_termino__gte=inicio_mes, puja__subasta_id__fecha_termino__lte=fin_mes)
+        ).distinct().count()
+
+        # Clientes recurrentes: usuarios que han participado en múltiples subastas
+        clientes_recurrentes = Usuario.objects.annotate(
+            num_subastas=Count('puja__subasta_id')
+        ).filter(num_subastas__gt=1).distinct().count()
+
+        # Usuario con más subastas ganadas en el mes y año seleccionados
         usuario_mas_ganadas = (
             Puja.objects.filter(
                 subasta_id__fecha_termino__gte=inicio_mes,
@@ -380,20 +436,58 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
         response = {
             "usuarios_registrados": usuarios_registrados,
+            "usuarios_activos": usuarios_activos,
+            "clientes_recurrentes": clientes_recurrentes,
             "usuario_mas_ganadas": usuario_mas_ganadas.get("usuario_id__nombre") if usuario_mas_ganadas else "N/A",
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
 
     @action(detail=False, methods=['get'], url_path='estadisticas-subasta')
     def get_estadisticas_subasta(self, request):
         """
         Endpoint para obtener estadísticas relacionadas con las subastas.
         """
-        # Subastas vigentes, pendientes y cerradas
-        subastas_vigentes = Subasta.objects.filter(estado="vigente").count()
-        subastas_pendientes = Subasta.objects.filter(estado="pendiente").count()
-        subastas_cerradas = Subasta.objects.filter(estado="cerrada").count()
+        # Obtener parámetros month y year de los query params
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
+
+        # Validar los parámetros month y year
+        try:
+            month = int(month) if month else timezone.now().month
+            year = int(year) if year else timezone.now().year
+        except ValueError:
+            return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Calcular el rango de fechas del mes y año seleccionados
+        try:
+            inicio_mes = make_aware(datetime(year, month, 1))
+            if month == 12:
+                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
+            else:
+                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+        except Exception as e:
+            return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Subastas vigentes, pendientes y cerradas en el mes y año seleccionados
+        subastas_vigentes = Subasta.objects.filter(
+            estado="vigente",
+            fecha_inicio__gte=inicio_mes,
+            fecha_inicio__lte=fin_mes
+        ).count()
+
+        subastas_pendientes = Subasta.objects.filter(
+            estado="pendiente",
+            fecha_termino__gte=inicio_mes,
+            fecha_termino__lte=fin_mes
+        ).count()
+
+        subastas_cerradas = Subasta.objects.filter(
+            estado="cerrada",
+            fecha_termino__gte=inicio_mes,
+            fecha_termino__lte=fin_mes
+        ).count()
 
         response = {
             "subastas_vigentes": subastas_vigentes,
