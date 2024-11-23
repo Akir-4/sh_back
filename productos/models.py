@@ -4,6 +4,15 @@ from tiendas.models import Tienda
 
 # Modelos para PRODUCTOS
 
+
+class Material(models.Model):
+    """Modelo para el tipo de material del producto."""
+    material_id = models.AutoField(primary_key=True)
+    material = models.CharField(max_length=100)
+
+    def __str__(self):
+        return self.material
+
 class Marca(models.Model):
     """Modelo para marcas de productos."""
     marca_id = models.AutoField(primary_key=True)
