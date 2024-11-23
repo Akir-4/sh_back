@@ -258,6 +258,32 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @action(detail=False, methods=['get'], url_path='subastas-pendientes')
+    def get_subastas_pendientes(self, request):
+        """
+        Endpoint para obtener las subastas pendientes.
+        """
+        try:
+            # Filtrar las subastas que están pendientes
+            subastas_pendientes = Subasta.objects.filter(estado="pendiente")
+
+            # Serializar los datos
+            serializer = SubastaSerializer(subastas_pendientes, many=True)
+
+            # Construir la respuesta
+            response = {
+                "subastas_pendientes": serializer.data,
+                "total": subastas_pendientes.count(),
+            }
+
+            return Response(response, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al cargar las subastas pendientes: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
     @action(detail=False, methods=['get'], url_path='subastas-terminan-hoy')
     def get_subastas_terminan_hoy(self, request):
         """
