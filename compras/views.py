@@ -226,6 +226,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 {"error": f"Error al cargar las tiendas registradas hoy: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+        
     @action(detail=False, methods=['get'], url_path='subastas-iniciadas-hoy')
     def get_subastas_iniciadas_hoy(self, request):
         """
@@ -322,6 +323,86 @@ class SubastaViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='estadisticas-tienda')
+    def get_estadisticas_tienda(self, request):
+            """
+            Endpoint para obtener estadísticas relacionadas con las tiendas.
+            """
+            # Ingresos por tienda
+            ingresos_por_tienda = (
+                Subasta.objects.filter(estado="cerrada")
+                .values("tienda_id__nombre_legal")
+                .annotate(ingresos=Sum("precio_final"))
+                .order_by("-ingresos")
+            )
+
+            # Tienda con más subastas realizadas
+            tienda_mas_subastas = (
+                Subasta.objects.values("tienda_id__nombre_legal")
+                .annotate(total_subastas=Count("subasta_id"))
+                .order_by("-total_subastas")
+                .first()
+            )
+
+            response = {
+                "ingresos_por_tienda": list(ingresos_por_tienda),
+                "tienda_mas_subastas": tienda_mas_subastas.get("tienda_id__nombre_legal") if tienda_mas_subastas else "N/A",
+            }
+
+            return Response(response, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='estadisticas-usuario')
+    def get_estadisticas_usuario(self, request):
+        """
+        Endpoint para obtener estadísticas relacionadas con los usuarios.
+        """
+        # Usuarios registrados este mes
+        month = request.query_params.get("month", timezone.now().month)
+        year = request.query_params.get("year", timezone.now().year)
+        inicio_mes = make_aware(datetime(year=int(year), month=int(month), day=1))
+        fin_mes = inicio_mes + timedelta(days=30)
+
+        usuarios_registrados = Usuario.objects.filter(created_at__gte=inicio_mes, created_at__lte=fin_mes).count()
+
+        # Usuario con más subastas ganadas este mes
+        usuario_mas_ganadas = (
+            Puja.objects.filter(
+                subasta_id__fecha_termino__gte=inicio_mes,
+                subasta_id__fecha_termino__lte=fin_mes,
+                subasta_id__estado="cerrada"
+            )
+            .values("usuario_id__nombre")
+            .annotate(total_ganadas=Count("puja_id"))
+            .order_by("-total_ganadas")
+            .first()
+        )
+
+        response = {
+            "usuarios_registrados": usuarios_registrados,
+            "usuario_mas_ganadas": usuario_mas_ganadas.get("usuario_id__nombre") if usuario_mas_ganadas else "N/A",
+        }
+
+        return Response(response, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=['get'], url_path='estadisticas-subasta')
+    def get_estadisticas_subasta(self, request):
+        """
+        Endpoint para obtener estadísticas relacionadas con las subastas.
+        """
+        # Subastas vigentes, pendientes y cerradas
+        subastas_vigentes = Subasta.objects.filter(estado="vigente").count()
+        subastas_pendientes = Subasta.objects.filter(estado="pendiente").count()
+        subastas_cerradas = Subasta.objects.filter(estado="cerrada").count()
+
+        response = {
+            "subastas_vigentes": subastas_vigentes,
+            "subastas_pendientes": subastas_pendientes,
+            "subastas_cerradas": subastas_cerradas,
+        }
+
+        return Response(response, status=status.HTTP_200_OK)
+
 
     @action(detail=True, methods=['post'])
     def finalizar(self, request, pk=None):
