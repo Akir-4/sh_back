@@ -258,31 +258,41 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    @action(detail=False, methods=['get'], url_path='subastas-pendientes')
-    def get_subastas_pendientes(self, request):
+    @action(detail=False, methods=['get'], url_path='subastas-pendientes-hoy')
+    def get_subastas_pendientes_hoy(self, request):
         """
-        Endpoint para obtener las subastas pendientes.
+        Endpoint para obtener las subastas que están en estado pendiente hoy.
         """
         try:
-            # Filtrar las subastas que están pendientes
-            subastas_pendientes = Subasta.objects.filter(estado="pendiente")
+            # Calcular el rango de fechas del día actual
+            hoy = make_aware(datetime.now())
+            inicio_dia = hoy.replace(hour=0, minute=0, second=0, microsecond=0)
+            fin_dia = hoy.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+            # Filtrar las subastas que están pendientes hoy
+            subastas_pendientes_hoy = Subasta.objects.filter(
+                estado='pendiente',
+                fecha_termino__gte=inicio_dia,
+                fecha_termino__lte=fin_dia
+            )
 
             # Serializar los datos
-            serializer = SubastaSerializer(subastas_pendientes, many=True)
+            serializer = SubastaSerializer(subastas_pendientes_hoy, many=True)
 
             # Construir la respuesta
             response = {
-                "subastas_pendientes": serializer.data,
-                "total": subastas_pendientes.count(),
+                "subastas_pendientes_hoy": serializer.data,
+                "total": subastas_pendientes_hoy.count(),
             }
 
             return Response(response, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(
-                {"error": f"Error al cargar las subastas pendientes: {str(e)}"},
+                {"error": f"Error al cargar las subastas pendientes de hoy: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
     @action(detail=False, methods=['get'], url_path='subastas-terminan-hoy')
     def get_subastas_terminan_hoy(self, request):
