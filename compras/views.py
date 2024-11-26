@@ -582,8 +582,12 @@ class SubastaViewSet(viewsets.ModelViewSet):
             # Por ejemplo, cancelar la transacción anterior o permitir un nuevo intento
             return Response({'error': 'Ya existe una transacción pendiente para esta subasta'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Calcular IVA y comisión
+        iva = puja_ganadora.monto * 0.19
+        comision = puja_ganadora.monto * 0.10
+        precio_final = puja_ganadora.monto + iva + comision
+
         # Proceder con la creación de la transacción si no hay conflictos
-        monto = puja_ganadora.monto
         buy_order = f"{subasta.subasta_id}-{puja_ganadora.puja_id}"
         session_id = f"session-{subasta.subasta_id}"
 
@@ -596,7 +600,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
             response = transaction.create(
                 buy_order=buy_order,
                 session_id=session_id,
-                amount=monto,
+                amount=precio_final,  # Utilizar el precio final calculado
                 return_url=return_url
             )
 
@@ -606,13 +610,16 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 estado="pendiente",
                 fecha=timezone.now(),
                 token_ws=response['token'],
-                monto=monto
+                monto=precio_final,  # Guardar el monto con IVA y comisión incluidos
+                iva=iva,
+                comision=comision
             )
 
             # Retornar la URL generada por Transbank para redirigir al usuario
             return Response({'url': response['url'] + "?token_ws=" + response['token']}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': f'Error al iniciar la transacción: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
     @action(detail=False, methods=['post'], url_path='confirmar_pago')
