@@ -710,11 +710,15 @@ def finalizar_subasta(self):
     """Finaliza la subasta actualizando el estado y el precio final."""
     puja_ganadora = self.puja_set.order_by('-monto').first()
     if puja_ganadora:
-        # El precio final es el precio inicial más el monto de la puja ganadora
         self.precio_final = (self.precio_inicial or 0) + puja_ganadora.monto
-        self.estado = "pendiente"  # Cambiar estado a "pendiente" si hay pujas
+        self.estado = "pendiente"
+        # Crear transacción asociada a la puja ganadora
+        Transaccion.objects.create(
+            puja_id=puja_ganadora,
+            estado="pendiente",
+            monto=self.precio_final,
+        )
     else:
-        # Si no hay pujas, establecer el precio final como el precio inicial
         self.precio_final = self.precio_inicial or 0
-        self.estado = "cerrada"  # Cambiar estado a "cerrada" si no hubo pujas
+        self.estado = "cerrada"
     self.save()
