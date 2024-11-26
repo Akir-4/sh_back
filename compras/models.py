@@ -79,8 +79,13 @@ class Transaccion(models.Model):
     fecha = models.DateTimeField(default=timezone.now)
     token_ws = models.CharField(max_length=100, blank=True, null=True)
     monto = models.IntegerField()
+    iva = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    comision = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     def save(self, *args, **kwargs):
+        if not self.pk and self.monto:  # Solo calcular en el momento de crear una nueva transacción
+            self.comision = self.monto * 0.10
+            self.iva = self.monto * 0.19
         super().save(*args, **kwargs)
         if self.estado == "completado":
             subasta = self.puja_id.subasta_id
