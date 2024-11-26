@@ -28,7 +28,7 @@ class Subasta(models.Model):
     def finalizar_subasta(self):
         puja_ganadora = self.puja_set.order_by('-monto').first()
         if puja_ganadora:
-            self.precio_final = puja_ganadora.monto * 1.10
+            self.precio_final = puja_ganadora.monto
             self.estado = "pendiente"
             # Enviar notificación al ganador
             usuario_ganador = puja_ganadora.usuario_id
