@@ -583,7 +583,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Ya existe una transacción pendiente para esta subasta'}, status=status.HTTP_400_BAD_REQUEST)
 
         # Proceder con la creación de la transacción si no hay conflictos
-        monto = puja_ganadora.monto * 1.10
+        monto = puja_ganadora.monto
         buy_order = f"{subasta.subasta_id}-{puja_ganadora.puja_id}"
         session_id = f"session-{subasta.subasta_id}"
 
