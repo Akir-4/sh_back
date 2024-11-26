@@ -81,80 +81,69 @@ class SubastaViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'], url_path='estadisticas')
     def get_estadisticas(self, request):
-        # Obtener parámetros month y year de los query params
+        
+        # Obtener parámetros `month` y `year`
         month = request.query_params.get("month")
         year = request.query_params.get("year")
 
-        # Validar los parámetros month y year
+        # Validar parámetros y calcular rango de fechas
         try:
             month = int(month) if month else timezone.now().month
             year = int(year) if year else timezone.now().year
+            inicio_mes = make_aware(datetime(year, month, 1))
+            fin_mes = make_aware(datetime(year + (month // 12), (month % 12) + 1, 1)) - timedelta(seconds=1)
         except ValueError:
             return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Calcular el rango de fechas del mes y año seleccionados
-        try:
-            inicio_mes = make_aware(datetime(year, month, 1))
-            if month == 12:
-                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
-            else:
-                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
         except Exception as e:
             return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Total de ingresos por comisiones
-        total_comisiones = Transaccion.objects.filter(
+        # Filtrar transacciones completadas asociadas a subastas cerradas
+        transacciones_pagadas = Transaccion.objects.filter(
             puja_id__subasta_id__fecha_termino__gte=inicio_mes,
             puja_id__subasta_id__fecha_termino__lte=fin_mes,
-            puja_id__subasta_id__estado="cerrada"
-        ).aggregate(total=Sum('comision'))['total'] or 0
-
-        # Conteo de comisiones
-        conteo_comisiones = Transaccion.objects.filter(
-            puja_id__subasta_id__fecha_termino__gte=inicio_mes,
-            puja_id__subasta_id__fecha_termino__lte=fin_mes,
-            puja_id__subasta_id__estado="cerrada"
-        ).count()
-
-        # Ingresos promedio por subasta cerrada
-        promedio_ingresos = Transaccion.objects.filter(
-            puja_id__subasta_id__fecha_termino__gte=inicio_mes,
-            puja_id__subasta_id__fecha_termino__lte=fin_mes,
-            puja_id__subasta_id__estado="cerrada"
-        ).aggregate(promedio=Avg('monto'))['promedio'] or 0
-
-        # Top 3 tiendas por ingresos generados
-        top_tiendas = (
-            Transaccion.objects.filter(
-                puja_id__subasta_id__fecha_termino__gte=inicio_mes,
-                puja_id__subasta_id__fecha_termino__lte=fin_mes,
-                puja_id__subasta_id__estado="cerrada"
-            )
-            .values("puja_id__subasta_id__tienda_id__nombre_legal")
-            .annotate(total_ingresos=Sum("comision"))
-            .order_by("-total_ingresos")[:3]
+            puja_id__subasta_id__estado="cerrada",
+            estado="completado"
         )
 
-        # Subastas cerradas en el mes
-        subastas_cerradas = Subasta.objects.filter(
+        # Total de comisiones generadas
+        total_comisiones = transacciones_pagadas.aggregate(total=Sum('comision'))['total'] or 0
+
+        # Conteo de transacciones con comisiones
+        conteo_comisiones = transacciones_pagadas.count()
+
+        # Promedio de comisiones por subasta cerrada y pagada
+        promedio_comisiones = transacciones_pagadas.aggregate(promedio=Avg('comision'))['promedio'] or 0
+
+        # Top 3 tiendas por comisiones generadas
+        top_tiendas = (
+            transacciones_pagadas
+            .values("puja_id__subasta_id__tienda_id__nombre_legal")
+            .annotate(total_comisiones=Sum("comision"))
+            .order_by("-total_comisiones")[:3]
+        )
+
+        # Subastas cerradas y pagadas en el mes
+        subastas_pagadas = Subasta.objects.filter(
             estado="cerrada",
             fecha_termino__gte=inicio_mes,
-            fecha_termino__lte=fin_mes
+            fecha_termino__lte=fin_mes,
+            transaccion__estado="completado"  # Filtrar usando la relación con transacciones
         ).count()
 
         # Construir la respuesta
         response = {
             "total_comisiones": total_comisiones,
             "conteo_comisiones": conteo_comisiones,
-            "promedio_ingresos_por_subasta": promedio_ingresos,
+            "promedio_comisiones_por_subasta": promedio_comisiones,
             "top_tiendas": [
-                {"nombre": tienda["puja_id__subasta_id__tienda_id__nombre_legal"], "ingresos": tienda["total_ingresos"]}
+                {"nombre": tienda["puja_id__subasta_id__tienda_id__nombre_legal"], "comisiones": tienda["total_comisiones"]}
                 for tienda in top_tiendas
             ],
-            "subastas_cerradas": subastas_cerradas,
+            "subastas_pagadas": subastas_pagadas,
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
     
     @action(detail=False, methods=['get'], url_path='usuarios-registrados-hoy')
     def get_usuarios_registrados_hoy(self, request):
