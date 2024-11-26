@@ -82,6 +82,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='estadisticas')
     def get_estadisticas(self, request):
         
+
         # Obtener parámetros `month` y `year`
         month = request.query_params.get("month")
         year = request.query_params.get("year")
@@ -127,8 +128,8 @@ class SubastaViewSet(viewsets.ModelViewSet):
             estado="cerrada",
             fecha_termino__gte=inicio_mes,
             fecha_termino__lte=fin_mes,
-            transaccion__estado="completado"  # Filtrar usando la relación con transacciones
-        ).count()
+            puja_set__transaccion__estado="completado"  # Filtrar usando la relación correcta
+        ).distinct().count()
 
         # Construir la respuesta
         response = {
@@ -143,6 +144,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
 
     
     @action(detail=False, methods=['get'], url_path='usuarios-registrados-hoy')
