@@ -399,64 +399,63 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
         return Response(response, status=status.HTTP_200_OK)
 
-
     @action(detail=False, methods=['get'], url_path='estadisticas-usuario')
     def get_estadisticas_usuarios(self, request):
-        # Obtener parámetros month y year de los query params
-        month = request.query_params.get("month")
-        year = request.query_params.get("year")
+        # Obtener el año y mes actual
+        today = datetime.now()
+        year = today.year
+        current_month = today.month
+        
+        # Rango de 6 meses
+        start_date = make_aware(datetime(year, current_month - 5, 1) if current_month > 5 else datetime(year - 1, 12 + (current_month - 5), 1))
 
-        # Validar los parámetros month y year
-        try:
-            month = int(month) if month else timezone.now().month
-            year = int(year) if year else timezone.now().year
-        except ValueError:
-            return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
+        # Listas para almacenar los datos por mes
+        usuarios_registrados_por_mes = []
+        usuarios_activos_por_mes = []
+        clientes_recurrentes_por_mes = []
 
-        # Calcular el rango de fechas del mes y año seleccionados
-        try:
-            inicio_mes = make_aware(datetime(year, month, 1))
+        # Iteramos sobre los últimos 6 meses
+        for i in range(6):
+            month = current_month - i
+            if month <= 0:
+                month = 12 + month
+                year -= 1  # Restar un año si pasamos a diciembre
+
+            # Obtener el primer día del mes
+            start_of_month = make_aware(datetime(year, month, 1))
+            # Calcular el último día del mes
             if month == 12:
-                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
+                end_of_month = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
             else:
-                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
-        except Exception as e:
-            return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Usuarios registrados en el mes y año seleccionados
-        usuarios_registrados = Usuario.objects.filter(
-            created_at__gte=inicio_mes,
-            created_at__lte=fin_mes
-        ).count()
-
-        # Usuarios activos: aquellos que han ganado al menos una subasta (tienen transacción completada)
-        usuarios_activos = Usuario.objects.filter(
-            Q(puja__subasta_id__estado='cerrada') & Q(puja__subasta_id__fecha_termino__gte=inicio_mes, puja__subasta_id__fecha_termino__lte=fin_mes)
-        ).distinct().count()
-
-        # Clientes recurrentes: usuarios que han participado en múltiples subastas
-        clientes_recurrentes = Usuario.objects.annotate(
-            num_subastas=Count('puja__subasta_id')
-        ).filter(num_subastas__gt=1).distinct().count()
-
-        # Usuario con más subastas ganadas en el mes y año seleccionados
-        usuario_mas_ganadas = (
-            Puja.objects.filter(
-                subasta_id__fecha_termino__gte=inicio_mes,
-                subasta_id__fecha_termino__lte=fin_mes,
-                subasta_id__estado="cerrada"
-            )
-            .values("usuario_id__nombre")
-            .annotate(total_ganadas=Count("puja_id"))
-            .order_by("-total_ganadas")
-            .first()
-        )
+                end_of_month = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+            
+            # Usuarios registrados en este mes
+            usuarios_registrados = Usuario.objects.filter(created_at__gte=start_of_month, created_at__lte=end_of_month).count()
+            usuarios_registrados_por_mes.append({
+                "mes": start_of_month.strftime("%B %Y"), 
+                "usuarios": usuarios_registrados
+            })
+            
+            # Usuarios activos en este mes
+            usuarios_activos = Usuario.objects.filter(
+                Q(puja__subasta_id__estado='cerrada') & Q(puja__subasta_id__fecha_termino__gte=start_of_month, puja__subasta_id__fecha_termino__lte=end_of_month)
+            ).distinct().count()
+            usuarios_activos_por_mes.append({
+                "mes": start_of_month.strftime("%B %Y"),
+                "usuarios": usuarios_activos
+            })
+            
+            # Clientes recurrentes en este mes
+            clientes_recurrentes = Usuario.objects.annotate(num_subastas=Count('puja__subasta_id')).filter(num_subastas__gt=1).distinct().count()
+            clientes_recurrentes_por_mes.append({
+                "mes": start_of_month.strftime("%B %Y"),
+                "usuarios": clientes_recurrentes
+            })
 
         response = {
-            "usuarios_registrados": usuarios_registrados,
-            "usuarios_activos": usuarios_activos,
-            "clientes_recurrentes": clientes_recurrentes,
-            "usuario_mas_ganadas": usuario_mas_ganadas.get("usuario_id__nombre") if usuario_mas_ganadas else "N/A",
+            "usuarios_registrados_por_mes": usuarios_registrados_por_mes,
+            "usuarios_activos_por_mes": usuarios_activos_por_mes,
+            "clientes_recurrentes_por_mes": clientes_recurrentes_por_mes
         }
 
         return Response(response, status=status.HTTP_200_OK)
