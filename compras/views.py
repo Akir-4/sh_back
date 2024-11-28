@@ -462,10 +462,25 @@ class SubastaViewSet(viewsets.ModelViewSet):
             "usuarios": clientes_recurrentes
         })
 
+        # Obtener usuarios por región
+        usuarios_por_region = Usuario.objects.values('region') \
+            .annotate(count=Count('usuario')) \
+            .filter(created_at__gte=inicio_mes, created_at__lte=fin_mes) \
+            .order_by('region')
+
+        # Obtener usuarios por comuna
+        usuarios_por_comuna = Usuario.objects.values('comuna') \
+            .annotate(count=Count('usuario')) \
+            .filter(created_at__gte=inicio_mes, created_at__lte=fin_mes) \
+            .order_by('comuna')
+
+        # Responder con los datos
         response = {
             "usuarios_registrados_por_mes": usuarios_registrados_por_mes,
             "usuarios_activos_por_mes": usuarios_activos_por_mes,
             "clientes_recurrentes_por_mes": clientes_recurrentes_por_mes,
+            "usuarios_por_region": list(usuarios_por_region),  
+            "usuarios_por_comuna": list(usuarios_por_comuna),  # Convertir el queryset a lista
         }
 
         return Response(response, status=status.HTTP_200_OK)
