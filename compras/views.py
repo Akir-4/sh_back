@@ -399,13 +399,13 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
         return Response(response, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'], url_path='estadisticas-usuario')
+    @action(detail=False, methods=['get'], url_path='estadisticas-usuarios')
     def get_estadisticas_usuarios(self, request):
         # Obtener el año y mes actual
         today = datetime.now()
         year = today.year
         current_month = today.month
-        
+
         # Rango de 6 meses
         start_date = make_aware(datetime(year, current_month - 5, 1) if current_month > 5 else datetime(year - 1, 12 + (current_month - 5), 1))
 
