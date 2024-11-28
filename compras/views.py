@@ -401,12 +401,34 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='estadisticas-usuario')
     def get_estadisticas_usuarios(self, request):
-        # Obtener el año y mes actual
-        today = datetime.now()
-        year = today.year
-        current_month = today.month
+        # Obtener los parámetros month y year desde los query params
+        month = request.query_params.get('month', None)
+        year = request.query_params.get('year', None)
 
-        # Cambiar la fecha de inicio a noviembre del año actual
+        # Si no se proporcionan, se usa el mes y año actual
+        today = datetime.now()
+        current_month = today.month
+        current_year = today.year
+
+        # Validar los parámetros
+        try:
+            if month:
+                month = int(month)
+                if month < 1 or month > 12:
+                    return Response({"error": "El parámetro 'month' debe estar entre 1 y 12."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                month = current_month
+
+            if year:
+                year = int(year)
+                if year < 1:
+                    return Response({"error": "El parámetro 'year' debe ser un número positivo."}, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                year = current_year
+        except ValueError:
+            return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Establecer el mes de inicio como noviembre del año actual
         start_month = 11  # Noviembre
         if current_month < start_month:
             year -= 1  # Si estamos antes de noviembre, tomamos el año anterior
@@ -416,20 +438,24 @@ class SubastaViewSet(viewsets.ModelViewSet):
         usuarios_activos_por_mes = []
         clientes_recurrentes_por_mes = []
 
+        # Diccionarios para almacenar el número de usuarios por región y comuna
+        usuarios_por_region = {}
+        usuarios_por_comuna = {}
+
         # Iterar desde noviembre hasta el mes actual (inclusive)
         for month_offset in range(0, current_month - start_month + 1):
             # Calcular el mes
-            month = start_month + month_offset
-            if month > 12:
-                month -= 12
+            month_iter = start_month + month_offset
+            if month_iter > 12:
+                month_iter -= 12
                 year += 1
 
-            start_of_month = make_aware(datetime(year, month, 1))
+            start_of_month = make_aware(datetime(year, month_iter, 1))
             # Calcular el último día del mes
-            if month == 12:
+            if month_iter == 12:
                 end_of_month = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
             else:
-                end_of_month = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+                end_of_month = make_aware(datetime(year, month_iter + 1, 1)) - timedelta(seconds=1)
 
             # Usuarios registrados en este mes
             usuarios_registrados = Usuario.objects.filter(created_at__gte=start_of_month, created_at__lte=end_of_month).count()
@@ -457,14 +483,21 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 "usuarios": clientes_recurrentes
             })
 
+        # Obtener estadísticas por región y comuna
+        usuarios_por_region = Usuario.objects.values('region').annotate(count=Count('usuario'))
+        usuarios_por_comuna = Usuario.objects.values('comuna').annotate(count=Count('usuario'))
+
         # Responder con los datos
         response = {
             "usuarios_registrados_por_mes": usuarios_registrados_por_mes,
             "usuarios_activos_por_mes": usuarios_activos_por_mes,
-            "clientes_recurrentes_por_mes": clientes_recurrentes_por_mes
+            "clientes_recurrentes_por_mes": clientes_recurrentes_por_mes,
+            "usuarios_por_region": usuarios_por_region,
+            "usuarios_por_comuna": usuarios_por_comuna,
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
 
 
     @action(detail=False, methods=['get'], url_path='estadisticas-subasta')
