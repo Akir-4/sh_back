@@ -401,99 +401,71 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='estadisticas-usuario')
     def get_estadisticas_usuarios(self, request):
-        # Obtener los parámetros month y year desde los query params
-        month = request.query_params.get('month', None)
-        year = request.query_params.get('year', None)
+        # Obtener parámetros month y year de los query params
+        month = request.query_params.get("month")
+        year = request.query_params.get("year")
 
-        # Si no se proporcionan, se usa el mes y año actual
-        today = datetime.now()
-        current_month = today.month
-        current_year = today.year
-
-        # Validar los parámetros
+        # Validar los parámetros month y year
         try:
-            if month:
-                month = int(month)
-                if month < 1 or month > 12:
-                    return Response({"error": "El parámetro 'month' debe estar entre 1 y 12."}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                month = current_month
-
-            if year:
-                year = int(year)
-                if year < 1:
-                    return Response({"error": "El parámetro 'year' debe ser un número positivo."}, status=status.HTTP_400_BAD_REQUEST)
-            else:
-                year = current_year
+            month = int(month) if month else datetime.now().month
+            year = int(year) if year else datetime.now().year
         except ValueError:
             return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Establecer el mes de inicio como noviembre del año actual
-        start_month = 11  # Noviembre
-        if current_month < start_month:
-            year -= 1  # Si estamos antes de noviembre, tomamos el año anterior
+        # Calcular el rango de fechas del mes y año seleccionados
+        try:
+            inicio_mes = make_aware(datetime(year, month, 1))
+            if month == 12:
+                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
+            else:
+                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+        except Exception as e:
+            return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Listas para almacenar los datos por mes
         usuarios_registrados_por_mes = []
         usuarios_activos_por_mes = []
         clientes_recurrentes_por_mes = []
 
-        # Diccionarios para almacenar el número de usuarios por región y comuna
-        usuarios_por_region = {}
-        usuarios_por_comuna = {}
+        # Obtener usuarios registrados en el mes solicitado
+        usuarios_registrados = Usuario.objects.filter(
+            created_at__gte=inicio_mes,
+            created_at__lte=fin_mes
+        ).count()
 
-        # Iterar desde noviembre hasta el mes actual (inclusive)
-        for month_offset in range(0, current_month - start_month + 1):
-            # Calcular el mes
-            month_iter = start_month + month_offset
-            if month_iter > 12:
-                month_iter -= 12
-                year += 1
+        usuarios_registrados_por_mes.append({
+            "mes": inicio_mes.strftime("%B %Y"),
+            "usuarios": usuarios_registrados
+        })
 
-            start_of_month = make_aware(datetime(year, month_iter, 1))
-            # Calcular el último día del mes
-            if month_iter == 12:
-                end_of_month = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
-            else:
-                end_of_month = make_aware(datetime(year, month_iter + 1, 1)) - timedelta(seconds=1)
+        # Obtener usuarios activos en el mes solicitado
+        usuarios_activos = Usuario.objects.filter(
+            Q(puja__subasta_id__estado='cerrada') &
+            Q(puja__subasta_id__fecha_termino__gte=inicio_mes, 
+              puja__subasta_id__fecha_termino__lte=fin_mes)
+        ).distinct().count()
 
-            # Usuarios registrados en este mes
-            usuarios_registrados = Usuario.objects.filter(created_at__gte=start_of_month, created_at__lte=end_of_month).count()
-            usuarios_registrados_por_mes.append({
-                "mes": start_of_month.strftime("%B %Y"),
-                "usuarios": usuarios_registrados
-            })
+        usuarios_activos_por_mes.append({
+            "mes": inicio_mes.strftime("%B %Y"),
+            "usuarios": usuarios_activos
+        })
 
-            # Usuarios activos en este mes
-            usuarios_activos = Usuario.objects.filter(
-                Q(puja__subasta_id__estado='cerrada') & 
-                Q(puja__subasta_id__fecha_termino__gte=start_of_month, puja__subasta_id__fecha_termino__lte=end_of_month)
-            ).distinct().count()
-            usuarios_activos_por_mes.append({
-                "mes": start_of_month.strftime("%B %Y"),
-                "usuarios": usuarios_activos
-            })
+        # Obtener clientes recurrentes en el mes solicitado
+        clientes_recurrentes = Usuario.objects.annotate(num_subastas=Count('puja__subasta_id')) \
+            .filter(num_subastas__gt=1, 
+                    puja__subasta_id__fecha_termino__gte=inicio_mes, 
+                    puja__subasta_id__fecha_termino__lte=fin_mes) \
+            .distinct().count()
 
-            # Clientes recurrentes en este mes
-            clientes_recurrentes = Usuario.objects.annotate(num_subastas=Count('puja__subasta_id')) \
-                .filter(num_subastas__gt=1, puja__subasta_id__fecha_termino__gte=start_of_month, puja__subasta_id__fecha_termino__lte=end_of_month) \
-                .distinct().count()
-            clientes_recurrentes_por_mes.append({
-                "mes": start_of_month.strftime("%B %Y"),
-                "usuarios": clientes_recurrentes
-            })
+        clientes_recurrentes_por_mes.append({
+            "mes": inicio_mes.strftime("%B %Y"),
+            "usuarios": clientes_recurrentes
+        })
 
-        # Obtener estadísticas por región y comuna
-        usuarios_por_region = Usuario.objects.values('region').annotate(count=Count('usuario'))
-        usuarios_por_comuna = Usuario.objects.values('comuna').annotate(count=Count('usuario'))
-
-        # Responder con los datos
         response = {
             "usuarios_registrados_por_mes": usuarios_registrados_por_mes,
             "usuarios_activos_por_mes": usuarios_activos_por_mes,
             "clientes_recurrentes_por_mes": clientes_recurrentes_por_mes,
-            "usuarios_por_region": usuarios_por_region,
-            "usuarios_por_comuna": usuarios_por_comuna,
         }
 
         return Response(response, status=status.HTTP_200_OK)
