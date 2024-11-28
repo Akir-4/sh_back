@@ -416,6 +416,10 @@ class SubastaViewSet(viewsets.ModelViewSet):
         usuarios_activos_por_mes = []
         clientes_recurrentes_por_mes = []
 
+        # Diccionarios para almacenar el número de usuarios por región y comuna
+        usuarios_por_region = {}
+        usuarios_por_comuna = {}
+
         # Iterar desde noviembre hasta el mes actual (inclusive)
         for month_offset in range(0, current_month - start_month + 1):
             # Calcular el mes
@@ -457,15 +461,20 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 "usuarios": clientes_recurrentes
             })
 
+        # Obtener estadísticas por región y comuna
+        usuarios_por_region = Usuario.objects.values('region').annotate(count=Count('usuario'))
+        usuarios_por_comuna = Usuario.objects.values('comuna').annotate(count=Count('usuario'))
+
         # Responder con los datos
         response = {
             "usuarios_registrados_por_mes": usuarios_registrados_por_mes,
             "usuarios_activos_por_mes": usuarios_activos_por_mes,
-            "clientes_recurrentes_por_mes": clientes_recurrentes_por_mes
+            "clientes_recurrentes_por_mes": clientes_recurrentes_por_mes,
+            "usuarios_por_region": usuarios_por_region,
+            "usuarios_por_comuna": usuarios_por_comuna,
         }
 
         return Response(response, status=status.HTTP_200_OK)
-
 
     @action(detail=False, methods=['get'], url_path='estadisticas-subasta')
     def get_estadisticas_subasta(self, request):
