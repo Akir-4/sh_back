@@ -445,12 +445,17 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 "usuarios": usuarios_activos
             })
             
-            # Clientes recurrentes en este mes
-            clientes_recurrentes = Usuario.objects.annotate(num_subastas=Count('puja__subasta_id')).filter(num_subastas__gt=1).distinct().count()
+           # Clientes recurrentes en este mes
+            clientes_recurrentes = Usuario.objects.annotate(
+                num_subastas=Count('puja__subasta_id', filter=Q(puja__subasta_id__fecha_inicio__gte=start_of_month, 
+                                                            puja__subasta_id__fecha_inicio__lte=end_of_month))
+            ).filter(num_subastas__gt=1).distinct().count()
+
             clientes_recurrentes_por_mes.append({
                 "mes": start_of_month.strftime("%B %Y"),
                 "usuarios": clientes_recurrentes
             })
+
 
         response = {
             "usuarios_registrados_por_mes": usuarios_registrados_por_mes,
