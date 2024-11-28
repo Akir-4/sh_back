@@ -407,20 +407,23 @@ class SubastaViewSet(viewsets.ModelViewSet):
         current_month = today.month
 
         # Cambiar la fecha de inicio a noviembre del año actual
-        start_date = make_aware(datetime(year, 11, 1))
+        start_month = 11  # Noviembre
+        if current_month < start_month:
+            year -= 1  # Si estamos antes de noviembre, tomamos el año anterior
 
         # Listas para almacenar los datos por mes
         usuarios_registrados_por_mes = []
         usuarios_activos_por_mes = []
         clientes_recurrentes_por_mes = []
 
-        # Iterar desde noviembre hasta el mes actual
-        for i in range(current_month - 10, current_month + 1):  # Desde noviembre hasta el mes actual
-            if i < 1:  # Si el mes es menor a 1, pasamos a diciembre del año anterior
-                i += 12
-                year -= 1
+        # Iterar desde noviembre hasta el mes actual (inclusive)
+        for month_offset in range(0, current_month - start_month + 1):
+            # Calcular el mes
+            month = start_month + month_offset
+            if month > 12:
+                month -= 12
+                year += 1
 
-            month = i
             start_of_month = make_aware(datetime(year, month, 1))
             # Calcular el último día del mes
             if month == 12:
@@ -431,13 +434,14 @@ class SubastaViewSet(viewsets.ModelViewSet):
             # Usuarios registrados en este mes
             usuarios_registrados = Usuario.objects.filter(created_at__gte=start_of_month, created_at__lte=end_of_month).count()
             usuarios_registrados_por_mes.append({
-                "mes": start_of_month.strftime("%B %Y"), 
+                "mes": start_of_month.strftime("%B %Y"),
                 "usuarios": usuarios_registrados
             })
 
             # Usuarios activos en este mes
             usuarios_activos = Usuario.objects.filter(
-                Q(puja__subasta_id__estado='cerrada') & Q(puja__subasta_id__fecha_termino__gte=start_of_month, puja__subasta_id__fecha_termino__lte=end_of_month)
+                Q(puja__subasta_id__estado='cerrada') & 
+                Q(puja__subasta_id__fecha_termino__gte=start_of_month, puja__subasta_id__fecha_termino__lte=end_of_month)
             ).distinct().count()
             usuarios_activos_por_mes.append({
                 "mes": start_of_month.strftime("%B %Y"),
@@ -445,12 +449,15 @@ class SubastaViewSet(viewsets.ModelViewSet):
             })
 
             # Clientes recurrentes en este mes
-            clientes_recurrentes = Usuario.objects.annotate(num_subastas=Count('puja__subasta_id')).filter(num_subastas__gt=1).distinct().count()
+            clientes_recurrentes = Usuario.objects.annotate(num_subastas=Count('puja__subasta_id')) \
+                .filter(num_subastas__gt=1, puja__subasta_id__fecha_termino__gte=start_of_month, puja__subasta_id__fecha_termino__lte=end_of_month) \
+                .distinct().count()
             clientes_recurrentes_por_mes.append({
                 "mes": start_of_month.strftime("%B %Y"),
                 "usuarios": clientes_recurrentes
             })
 
+        # Responder con los datos
         response = {
             "usuarios_registrados_por_mes": usuarios_registrados_por_mes,
             "usuarios_activos_por_mes": usuarios_activos_por_mes,
@@ -458,7 +465,6 @@ class SubastaViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
-
 
 
     @action(detail=False, methods=['get'], url_path='estadisticas-subasta')
