@@ -342,10 +342,10 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
         return Response(response, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'], url_path='progreso-ventas-meta')
-    def progreso_ventas_meta(self, request):
+    @action(detail=False, methods=['get'], url_path='estadisticas-tienda')
+    def get_estadisticas_tienda(self, request):
         """
-        Endpoint para obtener el progreso hacia la meta de incremento de ventas del 15%.
+        Endpoint para obtener estadísticas relacionadas con las tiendas.
         """
         # Obtener parámetros month y year de los query params
         month = request.query_params.get("month")
@@ -359,51 +359,86 @@ class SubastaViewSet(viewsets.ModelViewSet):
             return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Calcular el rango de fechas del mes y año seleccionados
-        inicio_mes = make_aware(datetime(year, month, 1))
-        fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+        try:
+            inicio_mes = make_aware(datetime(year, month, 1))
+            if month == 12:
+                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
+            else:
+                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
+        except Exception as e:
+            return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Obtener ingresos del mes actual
-        ingresos_mes_actual = (
+        # Ingresos por tienda en el mes y año seleccionados
+        ingresos_por_tienda = (
             Subasta.objects.filter(
                 estado="cerrada",
                 fecha_termino__gte=inicio_mes,
                 fecha_termino__lte=fin_mes
             )
-            .aggregate(ingresos=Sum("precio_final"))
-            .get("ingresos", 0)
+            .values("tienda_id__nombre_legal", "tienda_id__region", "tienda_id__comuna")
+            .annotate(ingresos=Sum("precio_final"))
+            .order_by("-ingresos")
         )
 
-        # Ingresos del primer mes (suponiendo que tienes un primer mes o un mes inicial definido)
-        # Si no tienes un mes inicial definido, puedes tomar el primer mes de subastas para la tienda.
-        primer_mes = make_aware(datetime(year, 1, 1))  # Primer mes del año
-        fin_primer_mes = make_aware(datetime(year, 2, 1)) - timedelta(seconds=1)
+        # Tienda con más subastas realizadas en el mes y año seleccionados
+        tienda_mas_subastas = (
+            Subasta.objects.filter(
+                fecha_inicio__gte=inicio_mes,
+                fecha_inicio__lte=fin_mes
+            )
+            .values("tienda_id__nombre_legal")
+            .annotate(total_subastas=Count("subasta_id"))
+            .order_by("-total_subastas")
+            .first()
+        )
 
-        ingresos_primer_mes = (
+        # Comparación con el mes anterior (si existe)
+        if month > 1:
+            mes_anterior = month - 1
+            year_anterior = year
+        else:
+            mes_anterior = 12
+            year_anterior = year - 1
+
+        # Calcular ingresos del mes anterior
+        inicio_mes_anterior = make_aware(datetime(year_anterior, mes_anterior, 1))
+        fin_mes_anterior = make_aware(datetime(year_anterior, mes_anterior + 1, 1)) - timedelta(seconds=1)
+        
+        ingresos_mes_anterior = (
             Subasta.objects.filter(
                 estado="cerrada",
-                fecha_termino__gte=primer_mes,
-                fecha_termino__lte=fin_primer_mes
+                fecha_termino__gte=inicio_mes_anterior,
+                fecha_termino__lte=fin_mes_anterior
             )
-            .aggregate(ingresos=Sum("precio_final"))
-            .get("ingresos", 0)
+            .values("tienda_id__nombre_legal")
+            .annotate(ingresos=Sum("precio_final"))
         )
 
-        # Calcular el incremento de ventas respecto al primer mes
-        if ingresos_primer_mes > 0:
-            incremento = ((ingresos_mes_actual - ingresos_primer_mes) / ingresos_primer_mes) * 100
-        else:
-            incremento = 0
+        # Calcular el progreso hacia la meta de incremento del 15% de ventas
+        ingresos_mes_actual = {tienda["tienda_id__nombre_legal"]: tienda["ingresos"] for tienda in ingresos_por_tienda}
+        ingresos_mes_anterior_dict = {tienda["tienda_id__nombre_legal"]: tienda["ingresos"] for tienda in ingresos_mes_anterior}
+        
+        progreso_meta = []
+        for tienda, ingresos in ingresos_mes_actual.items():
+            ingresos_anteriores = ingresos_mes_anterior_dict.get(tienda, 0)
+            incremento = ((ingresos - ingresos_anteriores) / ingresos_anteriores) * 100 if ingresos_anteriores else 0
+            meta_completada = "Sí" if incremento >= 15 else "No"
+            progreso_meta.append({
+                "tienda": tienda,
+                "ingresos_actuales": ingresos,
+                "ingresos_mes_anterior": ingresos_anteriores,
+                "incremento": incremento,
+                "meta_completada": meta_completada,
+            })
 
-        # Meta de incremento mensual (1.25%) hacia el 15% anual
-        meta_incremento_mensual = 1.25
-        progreso_meta = min((ingresos_mes_actual / ingresos_primer_mes - 1) * 100, 15)
-
+        # Formato de respuesta para gráficos
         response = {
-            "ingresos_mes_actual": ingresos_mes_actual,
-            "ingresos_primer_mes": ingresos_primer_mes,
-            "incremento": incremento,
-            "progreso_meta": progreso_meta,  # Progreso hacia el 15%
-            "meta_incremento_mensual": meta_incremento_mensual,
+            "ingresos_por_tienda": list(ingresos_por_tienda),
+            "tienda_mas_subastas": tienda_mas_subastas.get("tienda_id__nombre_legal") if tienda_mas_subastas else "N/A",
+            "progreso_meta": progreso_meta,  # Para ver el progreso hacia la meta del 15%
+            "comparacion_mes_anterior": list(ingresos_mes_anterior),  # Comparación con el mes anterior
+            "ingresos_mes_actual": ingresos_mes_actual,  # Datos de ingresos del mes actual
+            "ingresos_mes_anterior": ingresos_mes_anterior_dict,  # Ingresos del mes anterior
         }
 
         return Response(response, status=status.HTTP_200_OK)
