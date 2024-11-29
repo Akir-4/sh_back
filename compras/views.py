@@ -347,9 +347,11 @@ class SubastaViewSet(viewsets.ModelViewSet):
         """
         Endpoint para obtener estadísticas relacionadas con las tiendas.
         """
-        # Obtener parámetros month y year de los query params
+        # Obtener parámetros month, year, region y comuna de los query params
         month = request.query_params.get("month")
         year = request.query_params.get("year")
+        region = request.query_params.get("region")
+        comuna = request.query_params.get("comuna")
 
         # Validar los parámetros month y year
         try:
@@ -368,6 +370,13 @@ class SubastaViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Filtrar por región y comuna si están presentes
+        filter_params = {}
+        if region:
+            filter_params['region'] = region
+        if comuna:
+            filter_params['comuna'] = comuna
+
         # Ingresos por tienda en el mes y año seleccionados
         ingresos_por_tienda = (
             Subasta.objects.filter(
@@ -375,6 +384,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 fecha_termino__gte=inicio_mes,
                 fecha_termino__lte=fin_mes
             )
+            .filter(**filter_params)  # Filtra por región y comuna
             .values("tienda_id__nombre_legal")
             .annotate(ingresos=Sum("precio_final"))
             .order_by("-ingresos")
@@ -386,18 +396,56 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 fecha_inicio__gte=inicio_mes,
                 fecha_inicio__lte=fin_mes
             )
+            .filter(**filter_params)  # Filtra por región y comuna
             .values("tienda_id__nombre_legal")
             .annotate(total_subastas=Count("subasta_id"))
             .order_by("-total_subastas")
             .first()
         )
 
+        # KPI de incremento de ventas (15%)
+        ventas_ano_anterior = (
+            Subasta.objects.filter(
+                estado="cerrada",
+                fecha_termino__gte=make_aware(datetime(year-1, month, 1)),
+                fecha_termino__lte=make_aware(datetime(year-1, month + 1, 1)) - timedelta(seconds=1)
+            )
+            .values("tienda_id")
+            .annotate(ingresos_ano_anterior=Sum("precio_final"))
+        )
+
+        ventas_actuales = (
+            Subasta.objects.filter(
+                estado="cerrada",
+                fecha_termino__gte=inicio_mes,
+                fecha_termino__lte=fin_mes
+            )
+            .values("tienda_id")
+            .annotate(ingresos_actuales=Sum("precio_final"))
+        )
+
+        incremento_ventas = []
+        for tienda in ventas_actuales:
+            tienda_id = tienda['tienda_id']
+            ventas_ano = next((v for v in ventas_ano_anterior if v['tienda_id'] == tienda_id), None)
+            if ventas_ano:
+                porcentaje_incremento = ((tienda['ingresos_actuales'] - ventas_ano['ingresos_ano_anterior']) / ventas_ano['ingresos_ano_anterior']) * 100
+            else:
+                porcentaje_incremento = 0
+            incremento_ventas.append({
+                'tienda_id': tienda_id,
+                'incremento': porcentaje_incremento,
+                'meta_alcanzada': porcentaje_incremento >= 15
+            })
+
         response = {
             "ingresos_por_tienda": list(ingresos_por_tienda),
             "tienda_mas_subastas": tienda_mas_subastas.get("tienda_id__nombre_legal") if tienda_mas_subastas else "N/A",
+            "incremento_ventas": incremento_ventas
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
 
     @action(detail=False, methods=['get'], url_path='estadisticas-usuario')
     def get_estadisticas_usuarios(self, request):
