@@ -342,16 +342,14 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
         return Response(response, status=status.HTTP_200_OK)
 
-    @action(detail=False, methods=['get'], url_path='estadisticas-tienda')
-    def get_estadisticas_tienda(self, request):
+    @action(detail=False, methods=['get'], url_path='progreso-ventas-meta')
+    def progreso_ventas_meta(self, request):
         """
-        Endpoint para obtener estadísticas relacionadas con las tiendas.
+        Endpoint para obtener el progreso hacia la meta de incremento de ventas del 15%.
         """
-        # Obtener parámetros month, year, region y comuna de los query params
+        # Obtener parámetros month y year de los query params
         month = request.query_params.get("month")
         year = request.query_params.get("year")
-        region = request.query_params.get("region")
-        comuna = request.query_params.get("comuna")
 
         # Validar los parámetros month y year
         try:
@@ -361,87 +359,51 @@ class SubastaViewSet(viewsets.ModelViewSet):
             return Response({"error": "Los parámetros 'month' y 'year' deben ser números válidos."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Calcular el rango de fechas del mes y año seleccionados
-        try:
-            inicio_mes = make_aware(datetime(year, month, 1))
-            if month == 12:
-                fin_mes = make_aware(datetime(year + 1, 1, 1)) - timedelta(seconds=1)
-            else:
-                fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
-        except Exception as e:
-            return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+        inicio_mes = make_aware(datetime(year, month, 1))
+        fin_mes = make_aware(datetime(year, month + 1, 1)) - timedelta(seconds=1)
 
-        # Filtrar por región y comuna si están presentes
-        filter_params = {}
-        if region:
-            filter_params['region'] = region
-        if comuna:
-            filter_params['comuna'] = comuna
-
-        # Ingresos por tienda en el mes y año seleccionados
-        ingresos_por_tienda = (
+        # Obtener ingresos del mes actual
+        ingresos_mes_actual = (
             Subasta.objects.filter(
                 estado="cerrada",
                 fecha_termino__gte=inicio_mes,
                 fecha_termino__lte=fin_mes
             )
-            .filter(**filter_params)  # Filtra por región y comuna
-            .values("tienda_id__nombre_legal")
-            .annotate(ingresos=Sum("precio_final"))
-            .order_by("-ingresos")
+            .aggregate(ingresos=Sum("precio_final"))
+            .get("ingresos", 0)
         )
 
-        # Tienda con más subastas realizadas en el mes y año seleccionados
-        tienda_mas_subastas = (
-            Subasta.objects.filter(
-                fecha_inicio__gte=inicio_mes,
-                fecha_inicio__lte=fin_mes
-            )
-            .filter(**filter_params)  # Filtra por región y comuna
-            .values("tienda_id__nombre_legal")
-            .annotate(total_subastas=Count("subasta_id"))
-            .order_by("-total_subastas")
-            .first()
-        )
+        # Ingresos del primer mes (suponiendo que tienes un primer mes o un mes inicial definido)
+        # Si no tienes un mes inicial definido, puedes tomar el primer mes de subastas para la tienda.
+        primer_mes = make_aware(datetime(year, 1, 1))  # Primer mes del año
+        fin_primer_mes = make_aware(datetime(year, 2, 1)) - timedelta(seconds=1)
 
-        # KPI de incremento de ventas (15%)
-        ventas_ano_anterior = (
+        ingresos_primer_mes = (
             Subasta.objects.filter(
                 estado="cerrada",
-                fecha_termino__gte=make_aware(datetime(year-1, month, 1)),
-                fecha_termino__lte=make_aware(datetime(year-1, month + 1, 1)) - timedelta(seconds=1)
+                fecha_termino__gte=primer_mes,
+                fecha_termino__lte=fin_primer_mes
             )
-            .values("tienda_id")
-            .annotate(ingresos_ano_anterior=Sum("precio_final"))
+            .aggregate(ingresos=Sum("precio_final"))
+            .get("ingresos", 0)
         )
 
-        ventas_actuales = (
-            Subasta.objects.filter(
-                estado="cerrada",
-                fecha_termino__gte=inicio_mes,
-                fecha_termino__lte=fin_mes
-            )
-            .values("tienda_id")
-            .annotate(ingresos_actuales=Sum("precio_final"))
-        )
+        # Calcular el incremento de ventas respecto al primer mes
+        if ingresos_primer_mes > 0:
+            incremento = ((ingresos_mes_actual - ingresos_primer_mes) / ingresos_primer_mes) * 100
+        else:
+            incremento = 0
 
-        incremento_ventas = []
-        for tienda in ventas_actuales:
-            tienda_id = tienda['tienda_id']
-            ventas_ano = next((v for v in ventas_ano_anterior if v['tienda_id'] == tienda_id), None)
-            if ventas_ano:
-                porcentaje_incremento = ((tienda['ingresos_actuales'] - ventas_ano['ingresos_ano_anterior']) / ventas_ano['ingresos_ano_anterior']) * 100
-            else:
-                porcentaje_incremento = 0
-            incremento_ventas.append({
-                'tienda_id': tienda_id,
-                'incremento': porcentaje_incremento,
-                'meta_alcanzada': porcentaje_incremento >= 15
-            })
+        # Meta de incremento mensual (1.25%) hacia el 15% anual
+        meta_incremento_mensual = 1.25
+        progreso_meta = min((ingresos_mes_actual / ingresos_primer_mes - 1) * 100, 15)
 
         response = {
-            "ingresos_por_tienda": list(ingresos_por_tienda),
-            "tienda_mas_subastas": tienda_mas_subastas.get("tienda_id__nombre_legal") if tienda_mas_subastas else "N/A",
-            "incremento_ventas": incremento_ventas
+            "ingresos_mes_actual": ingresos_mes_actual,
+            "ingresos_primer_mes": ingresos_primer_mes,
+            "incremento": incremento,
+            "progreso_meta": progreso_meta,  # Progreso hacia el 15%
+            "meta_incremento_mensual": meta_incremento_mensual,
         }
 
         return Response(response, status=status.HTTP_200_OK)
