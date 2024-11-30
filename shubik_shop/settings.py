@@ -136,6 +136,13 @@ DATABASES = {
     }
 }
 
+DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
+
+AZURE_ACCOUNT_NAME = 'shubikimagenes'  # Nombre de la cuenta de almacenamiento
+AZURE_ACCOUNT_KEY = 'TVmYEyhm0n6puZ4SyIoYJA4QjblRUPxhukIco0F0OCQAOb6x26PjFBbAiixAGPz2iUZTUQ07KCTA+AStSX1Y5A=='  # Clave de acceso
+AZURE_CONTAINER = 'fotos'  # Nombre del contenedor
+
+
 
 #DATABASES = {
 #    'default': dj_database_url.config(
@@ -204,10 +211,10 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]  # Si tienes un directorio "static" para archivos estáticos
 
 # Configura la URL para los archivos multimedia
-MEDIA_URL = '/media/'
+MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER}/'
 
 # Configura el directorio donde se almacenarán los archivos multimedia
-MEDIA_ROOT = join(BASE_DIR, 'media')
+#MEDIA_ROOT = join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
