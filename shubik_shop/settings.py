@@ -139,7 +139,7 @@ DATABASES = {
 DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
 
 AZURE_ACCOUNT_NAME = 'shubikimagenes'  # Nombre de la cuenta de almacenamiento
-AZURE_ACCOUNT_KEY = 'TVmYEyhm0n6puZ4SyIoYJA4QjblRUPxhukIco0F0OCQAOb6x26PjFBbAiixAGPz2iUZTUQ07KCTA+AStSX1Y5A=='  # Clave de acceso
+AZURE_ACCOUNT_KEY = 'IpMte8VJvhACX7AKU2BE7yFNkwlQP5g/ttV69bn5mPRm8Nthn3M5I1A6X4qwaiuRVHj0KwfZ9Vpb+ASta4cOfg=='  # Clave de acceso
 AZURE_CONTAINER = 'fotos'  # Nombre del contenedor
 
 
