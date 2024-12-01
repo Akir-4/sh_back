@@ -136,11 +136,11 @@ DATABASES = {
     }
 }
 
-DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
+#DEFAULT_FILE_STORAGE = 'storages.backends.azure_storage.AzureStorage'
+#AZURE_ACCOUNT_NAME = 'shubikimagenes'  # Nombre de la cuenta de almacenamiento
+#AZURE_ACCOUNT_KEY = 'IpMte8VJvhACX7AKU2BE7yFNkwlQP5g/ttV69bn5mPRm8Nthn3M5I1A6X4qwaiuRVHj0KwfZ9Vpb+ASta4cOfg=='  # Clave de acceso
+#AZURE_CONTAINER = 'imagenes'  # Nombre del contenedor
 
-AZURE_ACCOUNT_NAME = 'shubikimagenes'  # Nombre de la cuenta de almacenamiento
-AZURE_ACCOUNT_KEY = 'IpMte8VJvhACX7AKU2BE7yFNkwlQP5g/ttV69bn5mPRm8Nthn3M5I1A6X4qwaiuRVHj0KwfZ9Vpb+ASta4cOfg=='  # Clave de acceso
-AZURE_CONTAINER = 'imagenes'  # Nombre del contenedor
 
 
 
@@ -211,10 +211,11 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]  # Si tienes un directorio "static" para archivos estáticos
 
 # Configura la URL para los archivos multimedia
-MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER}/'
+#MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER}/'
+MEDIA_URL = '/media/'
 
 # Configura el directorio donde se almacenarán los archivos multimedia
-#MEDIA_ROOT = join(BASE_DIR, 'media')
+MEDIA_ROOT = join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
