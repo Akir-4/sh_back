@@ -211,7 +211,7 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]  # Si tienes un directorio "static" para archivos estáticos
 
 # Configura la URL para los archivos multimedia
-MEDIA_URL = f'https://shubikimagenes.blob.core.windows.net'
+MEDIA_URL = f'https://shubikimagenes.blob.core.windows.net/'
 
 # Configura el directorio donde se almacenarán los archivos multimedia
 #MEDIA_ROOT = join(BASE_DIR, 'media')

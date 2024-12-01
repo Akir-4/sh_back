@@ -50,15 +50,16 @@ class Producto(models.Model):
         ('XXXL', 'XXXL'),
     )
     tamano = models.CharField(max_length=4, choices=TALLAS, null=False, blank=False)
-    imagen_1 = models.ImageField(upload_to='/fotos/', null=True, blank=True)
-    imagen_2 = models.ImageField(upload_to='/fotos/', null=True, blank=True, default=None)
-    imagen_3 = models.ImageField(upload_to='/fotos/', null=True, blank=True, default=None)
-    imagen_4 = models.ImageField(upload_to='/fotos/', null=True, blank=True, default=None)
+    imagen_1 = models.ImageField(upload_to='fotos/', null=True, blank=True)
+    imagen_2 = models.ImageField(upload_to='fotos/', null=True, blank=True, default=None)
+    imagen_3 = models.ImageField(upload_to='fotos/', null=True, blank=True, default=None)
+    imagen_4 = models.ImageField(upload_to='fotos/', null=True, blank=True, default=None)
     slug = models.SlugField(default='', null=False, blank=True)  # Permitir blank para auto-generar
     descripcion = models.CharField(max_length=200, null=True, blank=True)
     subastado = models.BooleanField(default=False)
 
     def __str__(self):
+        
         return self.nombre
 
     # Sobrescribir el método save para generar automáticamente el slug
