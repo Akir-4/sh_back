@@ -232,10 +232,10 @@ STATICFILES_DIRS = [BASE_DIR / "static"]  # Si tienes un directorio "static" par
 
 # Configura la URL para los archivos multimedia
 #MEDIA_URL = f'https://{AZURE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_CONTAINER}/'
-MEDIA_URL = '/media/'
+#MEDIA_URL = '/media/'
 
 # Configura el directorio donde se almacenarán los archivos multimedia
-MEDIA_ROOT = join(BASE_DIR, 'media')
+#MEDIA_ROOT = join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
