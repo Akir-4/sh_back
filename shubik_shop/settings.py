@@ -227,7 +227,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 # Asegúrate de tener esto configurado
-STATIC_URL = '/static/'
+#STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]  # Si tienes un directorio "static" para archivos estáticos
 
 # Configura la URL para los archivos multimedia
