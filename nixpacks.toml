@@ -1,0 +1,3 @@
+[build]
+  include = ["requirements.txt"]
+  run = "pip install -r requirements.txt && gunicorn shubik_shop.wsgi --log-file -"
