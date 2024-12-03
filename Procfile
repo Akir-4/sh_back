@@ -1,1 +1,1 @@
-web: gunicorn main:app
+web: pip install -r requirements.txt && gunicorn shubik_shop.wsgi --log-file -
