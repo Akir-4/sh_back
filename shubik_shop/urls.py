@@ -7,6 +7,7 @@ from django.conf.urls.static import static
 from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
+from .views import generate_presigned_url
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -36,6 +37,7 @@ urlpatterns = [
     path('api/', include('login.urls')),
     path('api/', include('logintienda.urls')),
     path('pagos/', include('pagos.urls')),
+    path('generate-presigned-url/', generate_presigned_url, name='generate_presigned_url'),
 ]
 
 
