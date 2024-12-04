@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'storages',
     'drf_yasg',
     'compras',
     'usuario',  # Cambia esto para activar las señales
