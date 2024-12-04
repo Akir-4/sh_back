@@ -161,8 +161,8 @@ STORAGES ={
     },
 } 
 
-#AWS_ACCESS_KEY_ID = 'AKIA3RYC6HKRTN6YUL6C'
-#AWS_SECRET_ACCESS_KEY = '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'
+AWS_ACCESS_KEY_ID = 'AKIA3RYC6HKRYNCSWD7V'
+AWS_SECRET_ACCESS_KEY = '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'
 AWS_STORAGE_BUCKET_NAME = 'shimagenes'
 
 # Configuración para django-storages (almacenamiento de archivos)
