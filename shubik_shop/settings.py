@@ -146,8 +146,8 @@ DATABASES = {
 
 
 # Configuración de AWS S3
-AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+#AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+#AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
 #AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
 AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-2') 
 
@@ -163,7 +163,7 @@ STORAGES ={
 
 #AWS_ACCESS_KEY_ID = 'AKIA3RYC6HKRTN6YUL6C'
 #AWS_SECRET_ACCESS_KEY = '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'
-AWS_STORAGE_BUCKET_NAME = 'shubik'
+AWS_STORAGE_BUCKET_NAME = 'shimagenes'
 
 # Configuración para django-storages (almacenamiento de archivos)
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
