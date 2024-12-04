@@ -146,10 +146,24 @@ DATABASES = {
 
 
 # Configuración de AWS S3
-AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
-AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-2')  # Región por defecto
+#AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+#AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+#AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+AWS_S3_REGION_NAME = os.getenv('AWS_S3_REGION_NAME', 'us-east-2') 
+
+
+STORAGES ={
+    "default": {
+        "BACKEND": "storages.backends.s3.S3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+} 
+
+AWS_ACCESS_KEY_ID = 'AKIA3RYC6HKRTN6YUL6C'
+AWS_SECRET_ACCESS_KEY = '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'
+AWS_STORAGE_BUCKET_NAME = 'shubik'
 
 # Configuración para django-storages (almacenamiento de archivos)
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
@@ -164,7 +178,11 @@ AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/static/'
 
 # URL de los archivos de medios (por ejemplo, imágenes subidas por el usuario)
+MEDIA_ROOT = join(BASE_DIR, 'media')
 MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/media/'
+
+
+
 
 #DATABASES = {
 #    'default': dj_database_url.config(
