@@ -168,7 +168,7 @@ AWS_STORAGE_BUCKET_NAME = 'shimagenes'
 # Configuración para django-storages (almacenamiento de archivos)
 DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-AWS_DEFAULT_ACL = 'public-read'
+
 
 # Configuración de los archivos estáticos (si es necesario)
 STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
