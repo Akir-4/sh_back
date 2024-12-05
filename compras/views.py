@@ -850,3 +850,16 @@ def finalizar_subasta(self):
         self.precio_final = self.precio_inicial or 0
         self.estado = "cerrada"
     self.save()
+    
+@action(detail=True, methods=['get'], url_path='detalles')
+def get_detalles_transaccion(self, request, pk=None):
+        """
+        Endpoint para obtener los detalles de una transacción específica.
+        """
+        try:
+            transaccion = self.get_object()
+            serializer = self.get_serializer(transaccion)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Transaccion.DoesNotExist:
+            return Response({'error': 'Transacción no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+    
