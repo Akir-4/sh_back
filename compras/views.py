@@ -558,7 +558,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
         except Exception as e:
             return Response({"error": f"Error al calcular las fechas: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Subastas vigentes, pendientes y cerradas en el mes y año seleccionados
+        # Subastas por estado en el mes actual
         subastas_vigentes = Subasta.objects.filter(
             estado="vigente",
             fecha_inicio__gte=inicio_mes,
@@ -577,10 +577,67 @@ class SubastaViewSet(viewsets.ModelViewSet):
             fecha_termino__lte=fin_mes
         ).count()
 
+        # Estadísticas adicionales para las subastas cerradas (ganadas)
+        subastas_cerradas_query = Subasta.objects.filter(
+            estado="cerrada",
+            fecha_termino__gte=inicio_mes,
+            fecha_termino__lte=fin_mes
+        )
+
+        # Precio promedio de subastas ganadas
+        precio_promedio = subastas_cerradas_query.aggregate(Avg('precio_final'))['precio_final__avg'] or 0
+
+        # Subasta más cara
+        subasta_mas_cara = subastas_cerradas_query.aggregate(Max('precio_final'))['precio_final__max'] or 0
+
+        # Subastas por tipo de prenda (con más pujas)
+        pujas_por_tipo_prenda = Puja.objects.filter(
+            subasta_id__fecha_inicio__gte=inicio_mes,
+            subasta_id__fecha_inicio__lte=fin_mes
+        ).values('subasta_id__producto_id__tipo_prenda').annotate(num_pujas=Count('id')).order_by('-num_pujas')
+
+        # Calcular fechas para el mes anterior
+        mes_anterior = (month - 1) if month > 1 else 12
+        anio_anterior = year if month > 1 else (year - 1)
+
+        inicio_mes_anterior = make_aware(datetime(anio_anterior, mes_anterior, 1))
+        if mes_anterior == 12:
+            fin_mes_anterior = make_aware(datetime(anio_anterior + 1, 1, 1)) - timedelta(seconds=1)
+        else:
+            fin_mes_anterior = make_aware(datetime(anio_anterior, mes_anterior + 1, 1)) - timedelta(seconds=1)
+
+        # Subastas por estado en el mes anterior
+        subastas_vigentes_anterior = Subasta.objects.filter(
+            estado="vigente",
+            fecha_inicio__gte=inicio_mes_anterior,
+            fecha_inicio__lte=fin_mes_anterior
+        ).count()
+
+        subastas_pendientes_anterior = Subasta.objects.filter(
+            estado="pendiente",
+            fecha_termino__gte=inicio_mes_anterior,
+            fecha_termino__lte=fin_mes_anterior
+        ).count()
+
+        subastas_cerradas_anterior = Subasta.objects.filter(
+            estado="cerrada",
+            fecha_termino__gte=inicio_mes_anterior,
+            fecha_termino__lte=fin_mes_anterior
+        ).count()
+
+        # Respuesta con las estadísticas
         response = {
             "subastas_vigentes": subastas_vigentes,
             "subastas_pendientes": subastas_pendientes,
             "subastas_cerradas": subastas_cerradas,
+            "precio_promedio_subastas_cerradas": precio_promedio,
+            "subasta_mas_cara": subasta_mas_cara,
+            "subastas_por_tipo_prenda": list(pujas_por_tipo_prenda),
+            "comparativa_mes_anterior": {
+                "subastas_vigentes": subastas_vigentes_anterior,
+                "subastas_pendientes": subastas_pendientes_anterior,
+                "subastas_cerradas": subastas_cerradas_anterior,
+            }
         }
 
         return Response(response, status=status.HTTP_200_OK)
