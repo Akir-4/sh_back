@@ -596,6 +596,12 @@ class SubastaViewSet(viewsets.ModelViewSet):
             fecha_inicio__lte=fin_mes
         ).values('producto_id__tipo_id__tipo').annotate(num_subastas=Count('producto_id')).order_by('-num_subastas')
 
+        # Subastas por tipo de prenda y estado
+        subastas_por_tipo_prenda_estado = Subasta.objects.filter(
+            fecha_inicio__gte=inicio_mes,
+            fecha_inicio__lte=fin_mes
+        ).values('producto_id__tipo_id__tipo', 'estado').annotate(num_subastas=Count('producto_id')).order_by('-num_subastas')
+
         # Calcular fechas para el mes anterior
         mes_anterior = (month - 1) if month > 1 else 12
         anio_anterior = year if month > 1 else (year - 1)
@@ -633,6 +639,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
             "precio_promedio_subastas_cerradas": precio_promedio,
             "subasta_mas_cara": subasta_mas_cara,
             "subastas_por_tipo_prenda": list(subastas_por_tipo_prenda),
+            "subastas_por_tipo_prenda_estado": list(subastas_por_tipo_prenda_estado),
             "comparativa_mes_anterior": {
                 "subastas_vigentes": subastas_vigentes_anterior,
                 "subastas_pendientes": subastas_pendientes_anterior,
@@ -641,6 +648,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
 
 
 
