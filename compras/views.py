@@ -684,64 +684,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['post'])
-    def iniciar_pago(self, request, pk=None):
-        subasta = self.get_object()
-
-        # Verificar si la subasta está en estado pendiente o cerrada
-        if subasta.estado not in ['pendiente', 'cerrada']:
-            return Response({'error': 'La subasta no está en un estado válido para iniciar el pago.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Verificar si ya existe una transacción pendiente para la puja ganadora
-        puja_ganadora = subasta.puja_set.order_by('-monto').first()
-        if not puja_ganadora:
-            return Response({'error': 'No hay pujas para esta subasta.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        transaccion_pendiente = Transaccion.objects.filter(puja_id=puja_ganadora, estado="pendiente").first()
-        if transaccion_pendiente:
-            # Aquí podrías decidir reiniciar la transacción si no ha sido completada
-            # Por ejemplo, cancelar la transacción anterior o permitir un nuevo intento
-            return Response({'error': 'Ya existe una transacción pendiente para esta subasta'}, status=status.HTTP_400_BAD_REQUEST)
-
-        # Calcular IVA y comisión
-        iva = puja_ganadora.monto * 0.19
-        comision = puja_ganadora.monto * 0.10
-        precio_final = puja_ganadora.monto + iva + comision
-
-        # Proceder con la creación de la transacción si no hay conflictos
-        buy_order = f"{subasta.subasta_id}-{puja_ganadora.puja_id}"
-        session_id = f"session-{subasta.subasta_id}"
-
-        # URL a la cual Transbank redirigirá tras completar el pago
-        return_url = 'http://localhost:3000/confirmar-pago/'
-
-        try:
-            # Crear una instancia de Transaction
-            transaction = Transaction()
-            response = transaction.create(
-                buy_order=buy_order,
-                session_id=session_id,
-                amount=precio_final,  # Utilizar el precio final calculado
-                return_url=return_url
-            )
-
-            # Creación de la transacción en la base de datos
-            Transaccion.objects.create(
-                puja_id=puja_ganadora,
-                estado="pendiente",
-                fecha=timezone.now(),
-                token_ws=response['token'],
-                monto=precio_final,  # Guardar el monto con IVA y comisión incluidos
-                iva=iva,
-                comision=comision
-            )
-
-            # Retornar la URL generada por Transbank para redirigir al usuario
-            return Response({'url': response['url'] + "?token_ws=" + response['token']}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': f'Error al iniciar la transacción: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
+    
 
     @action(detail=False, methods=['post'], url_path='confirmar_pago')
     def confirmar_pago(self, request):
@@ -770,14 +713,18 @@ class SubastaViewSet(viewsets.ModelViewSet):
                 # Cambiar el estado de la subasta a "cerrada" si estaba en "pendiente"
                 if subasta.estado == "pendiente":
                     subasta.estado = "cerrada"
-                    subasta.fecha_termino = timezone.now()  # Puedes actualizar la fecha de término a la actual
+                    subasta.fecha_termino = timezone.now()  # Actualizar la fecha de término a la actual
                     subasta.save()
 
                     # Eliminar el producto asociado a la subasta, ya que la transacción fue completada
                     producto = subasta.producto_id
                     producto.delete()
 
-                return Response({"message": "Pago completado con éxito, producto eliminado"}, status=status.HTTP_200_OK)
+                # Devolver el ID de la transacción junto con el mensaje de éxito
+                return Response({
+                    "message": "Pago completado con éxito, producto eliminado",
+                    "transaccion_id": transaccion.transaccion_id
+                }, status=status.HTTP_200_OK)
             else:
                 return Response({"error": "El pago no fue autorizado"}, status=status.HTTP_400_BAD_REQUEST)
         
@@ -785,6 +732,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Transacción no encontrada'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({'error': f'Error al confirmar el pago: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
     @action(detail=False, methods=['get'], url_path='ganadas-usuario/(?P<usuario_id>[^/.]+)')
@@ -850,7 +798,7 @@ def finalizar_subasta(self):
         self.precio_final = self.precio_inicial or 0
         self.estado = "cerrada"
     self.save()
-    
+
 @action(detail=True, methods=['get'], url_path='detalles')
 def get_detalles_transaccion(self, request, pk=None):
         """
