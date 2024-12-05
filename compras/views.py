@@ -652,6 +652,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
 
 
+
     @action(detail=True, methods=['post'])
     def finalizar(self, request, pk=None):
         subasta = self.get_object()
