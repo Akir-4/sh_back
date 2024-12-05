@@ -10,7 +10,7 @@ from .filters import SubastaFilter  # Importar el filtro
 from transbank.webpay.webpay_plus.transaction import Transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
-from django.db.models import Count, Sum, Avg, Q
+from django.db.models import Count, Sum, Avg, Q, Max
 from django.utils.timezone import make_aware
 from datetime import datetime, timedelta
 from django.db import models
