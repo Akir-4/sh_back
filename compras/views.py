@@ -594,7 +594,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
         pujas_por_tipo_prenda = Puja.objects.filter(
             subasta_id__fecha_inicio__gte=inicio_mes,
             subasta_id__fecha_inicio__lte=fin_mes
-        ).values('subasta_id__producto_id__tipo_prenda').annotate(num_pujas=Count('id')).order_by('-num_pujas')
+        ).values('subasta_id__producto_id__tipo_id__tipo').annotate(num_pujas=Count('id')).order_by('-num_pujas')
 
         # Calcular fechas para el mes anterior
         mes_anterior = (month - 1) if month > 1 else 12
@@ -641,6 +641,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
         }
 
         return Response(response, status=status.HTTP_200_OK)
+
 
 
     @action(detail=True, methods=['post'])
