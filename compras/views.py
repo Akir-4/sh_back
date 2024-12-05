@@ -590,11 +590,17 @@ class SubastaViewSet(viewsets.ModelViewSet):
         # Subasta más cara
         subasta_mas_cara = subastas_cerradas_query.aggregate(Max('precio_final'))['precio_final__max'] or 0
 
-        # Subastas por tipo de prenda (con más pujas)
-        pujas_por_tipo_prenda = Puja.objects.filter(
-            subasta_id__fecha_inicio__gte=inicio_mes,
-            subasta_id__fecha_inicio__lte=fin_mes
-        ).values('subasta_id__producto_id__tipo_id__tipo').annotate(num_pujas=Count('puja_id')).order_by('-num_pujas')
+        # Subastas por tipo de prenda (con más subastas)
+        subastas_por_tipo_prenda = Subasta.objects.filter(
+            fecha_inicio__gte=inicio_mes,
+            fecha_inicio__lte=fin_mes
+        ).values('producto_id__tipo_id__tipo').annotate(num_subastas=Count('id')).order_by('-num_subastas')
+
+        # Subastas por estado por tipo de prenda
+        subastas_por_tipo_prenda_estado = Subasta.objects.filter(
+            fecha_inicio__gte=inicio_mes,
+            fecha_inicio__lte=fin_mes
+        ).values('producto_id__tipo_id__tipo', 'estado').annotate(num_subastas=Count('id')).order_by('producto_id__tipo_id__tipo', '-num_subastas')
 
         # Calcular fechas para el mes anterior
         mes_anterior = (month - 1) if month > 1 else 12
@@ -632,7 +638,8 @@ class SubastaViewSet(viewsets.ModelViewSet):
             "subastas_cerradas": subastas_cerradas,
             "precio_promedio_subastas_cerradas": precio_promedio,
             "subasta_mas_cara": subasta_mas_cara,
-            "subastas_por_tipo_prenda": list(pujas_por_tipo_prenda),
+            "subastas_por_tipo_prenda": list(subastas_por_tipo_prenda),
+            "subastas_por_tipo_prenda_estado": list(subastas_por_tipo_prenda_estado),
             "comparativa_mes_anterior": {
                 "subastas_vigentes": subastas_vigentes_anterior,
                 "subastas_pendientes": subastas_pendientes_anterior,
