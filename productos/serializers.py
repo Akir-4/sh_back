@@ -5,7 +5,7 @@ from tiendas.models import Tienda
 class DonacionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Donacion
-        fields = ['id', 'nombre_ong', 'descripcion', 'ubicacion']
+        fields = ['donacion_id', 'nombre_ong', 'descripcion', 'ubicacion', 'fecha_creacion']
 
 class MaterialSerializer(serializers.ModelSerializer):
     class Meta:
