@@ -1,5 +1,5 @@
 from rest_framework import viewsets, status
-from .models import Producto, Tipo_Prenda, Marca,Material
+from .models import Producto, Tipo_Prenda, Marca,Material,Donacion
 from tiendas.models import Tienda
 from compras.models import Puja, Subasta
 from django_filters.rest_framework import DjangoFilterBackend
@@ -7,11 +7,15 @@ from rest_framework import generics
 from django.db.models import Prefetch
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
-from .serializers import ProductoSerializer, Tipo_PrendaSerializer, MarcaSerializer,MaterialSerializer
+from .serializers import ProductoSerializer, Tipo_PrendaSerializer, MarcaSerializer,MaterialSerializer,DonacionSerializer
 from compras.serializers import PujaSerializer
 from rest_framework.filters import OrderingFilter
 from tiendas.models import Bodega
 
+
+class DonacionViewSet(viewsets.ModelViewSet):
+    queryset = Donacion.objects.all()
+    serializer_class = DonacionSerializer
 
 class ProductoConPujasView(generics.RetrieveAPIView):
     queryset = Producto.objects.all()

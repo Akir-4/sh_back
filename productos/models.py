@@ -4,6 +4,17 @@ from tiendas.models import Tienda
 
 # Modelos para PRODUCTOS
 
+# Modelo de Donación
+class Donacion(models.Model):
+    """Modelo para registrar donaciones a ONGs."""
+    donacion_id = models.AutoField(primary_key=True)
+    nombre_ong = models.CharField(max_length=200)  # Nombre de la ONG
+    descripcion = models.TextField()  # Descripción de la donación o detalles
+    ubicacion = models.CharField(max_length=200)  # Ubicación de la ONG
+    fecha_creacion = models.DateTimeField(auto_now_add=True)  # Fecha de creación de la donación
+
+    def __str__(self):
+        return f"Donación a {self.nombre_ong}"
 
 class Material(models.Model):
     """Modelo para el tipo de material del producto."""
@@ -57,7 +68,7 @@ class Producto(models.Model):
     slug = models.SlugField(default='', null=False, blank=True)  # Permitir blank para auto-generar
     descripcion = models.CharField(max_length=200, null=True, blank=True)
     subastado = models.BooleanField(default=False)
-
+    donacion = models.ForeignKey(Donacion, on_delete=models.SET_NULL, null=True, blank=True)  # Relación opcional con Donación
     def __str__(self):
         return self.nombre
 

@@ -1,6 +1,11 @@
 from rest_framework import serializers
-from .models import Producto, Tipo_Prenda, Marca,Material
+from .models import Producto, Tipo_Prenda, Marca,Material,Donacion
 from tiendas.models import Tienda
+
+class DonacionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Donacion
+        fields = ['id', 'nombre_ong', 'descripcion', 'ubicacion']
 
 class MaterialSerializer(serializers.ModelSerializer):
     class Meta:
