@@ -27,6 +27,151 @@ class SubastaViewSet(viewsets.ModelViewSet):
     filterset_class = SubastaFilter
 
     def get_queryset(self):
+        """Obtener las subastas y finalizar las vencidas automáticamente."""
+        subastas_vencidas = Subasta.objects.filter(
+            fecha_termino__lte=timezone.now(),
+            estado='vigente'
+        )
+        for subasta in subastas_vencidas:
+            subasta.finalizar_subasta()
+
+        return Subasta.objects.filter(
+            estado__in=['vigente', 'pendiente', 'cerrada']
+        ).select_related('producto_id', 'tienda_id')
+
+    def create(self, request, *args, **kwargs):
+        """Crear una nueva subasta y marcar el producto como subastado."""
+        producto_id = request.data.get('producto_id')
+
+        # Verificar si el producto ya tiene una subasta vigente
+        if Subasta.objects.filter(producto_id=producto_id, estado='vigente').exists():
+            raise ValidationError({'error': 'El producto ya tiene una subasta vigente.'})
+
+        # Actualizar el campo `subastado` del producto
+        Producto.objects.filter(pk=producto_id).update(subastado=True)
+
+        # Crear la subasta
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def finalizar(self, request, pk=None):
+        """Finalizar una subasta específica."""
+        subasta = self.get_object()
+
+        if subasta.estado != 'vigente':
+            return Response({'error': 'Solo se pueden finalizar subastas vigentes.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if subasta.fecha_termino <= timezone.now():
+            subasta.finalizar_subasta()
+            return Response({'status': 'Subasta finalizada exitosamente.'}, status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'La subasta no puede finalizar antes de la fecha de término.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def iniciar_pago(self, request, pk=None):
+        """Iniciar el proceso de pago para la subasta."""
+        subasta = self.get_object()
+
+        if subasta.estado not in ['pendiente']:
+            return Response({'error': 'La subasta no está en un estado válido para iniciar el pago.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        puja_ganadora = subasta.puja_set.order_by('-monto').first()
+        if not puja_ganadora:
+            return Response({'error': 'No hay pujas en esta subasta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verificar si ya existe una transacción pendiente
+        if Transaccion.objects.filter(puja_id=puja_ganadora, estado="pendiente").exists():
+            return Response({'error': 'Ya existe una transacción pendiente para esta subasta.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        iva = puja_ganadora.monto * 0.19
+        comision = puja_ganadora.monto * 0.10
+        precio_final = puja_ganadora.monto + iva + comision
+
+        # Crear la transacción con Transbank
+        buy_order = f"{subasta.subasta_id}-{puja_ganadora.puja_id}"
+        session_id = f"session-{subasta.subasta_id}"
+        return_url = 'http://localhost:3000/confirmar-pago/'
+
+        try:
+            transaction = Transaction()
+            response = transaction.create(
+                buy_order=buy_order,
+                session_id=session_id,
+                amount=precio_final,
+                return_url=return_url
+            )
+
+            # Guardar la transacción
+            Transaccion.objects.create(
+                puja_id=puja_ganadora,
+                estado="pendiente",
+                token_ws=response['token'],
+                monto=precio_final,
+                iva=iva,
+                comision=comision
+            )
+
+            return Response({'url': response['url'] + "?token_ws=" + response['token']}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'Error al iniciar la transacción: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'], url_path='confirmar_pago')
+    def confirmar_pago(self, request):
+        """Confirmar el pago desde Transbank."""
+        token_ws = request.data.get("token_ws")
+        if not token_ws:
+            return Response({"error": "Token de pago no recibido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Confirmar la transacción con Transbank
+            response = Transaction().commit(token_ws)
+            if response['status'] == "AUTHORIZED":
+                transaccion = Transaccion.objects.get(token_ws=token_ws)
+                transaccion.estado = "completado"
+                transaccion.save()
+
+                subasta = transaccion.puja_id.subasta_id
+                if subasta.estado == "pendiente":
+                    subasta.estado = "cerrada"
+                    subasta.fecha_termino = timezone.now()
+                    subasta.save()
+
+                    # Eliminar el producto si el pago fue exitoso
+                    subasta.producto_id.delete()
+
+                return Response({"message": "Pago completado con éxito, producto eliminado."}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "El pago no fue autorizado."}, status=status.HTTP_400_BAD_REQUEST)
+        except Transaccion.DoesNotExist:
+            return Response({'error': 'Transacción no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': f'Error al confirmar el pago: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PujaViewSet(viewsets.ModelViewSet):
+    queryset = Puja.objects.all()
+    serializer_class = PujaSerializer
+
+    def create(self, request, *args, **kwargs):
+        """Crear una puja y actualizar el precio de la subasta."""
+        subasta_id = request.data.get('subasta_id')
+        subasta = Subasta.objects.get(pk=subasta_id)
+
+        if subasta.sub_terminada:
+            return Response({'error': 'No se pueden realizar pujas en una subasta finalizada.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return super().create(request, *args, **kwargs)
+
+
+class TransaccionViewSet(viewsets.ModelViewSet):
+    queryset = Transaccion.objects.all()
+    serializer_class = TransaccionSerializer
+
+
+    def get_queryset(self):
         # Finalizar subastas que ya han terminado automáticamente
         subastas_vencidas = Subasta.objects.filter(
             fecha_termino__lte=timezone.now(),
