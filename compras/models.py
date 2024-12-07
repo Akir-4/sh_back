@@ -24,12 +24,12 @@ class Subasta(models.Model):
 
     @property
     def iva(self):
-        """Calcula el IVA del precio base."""
+        """Calcula el IVA del precio inicial."""
         return self.precio_inicial * 0.19 if self.precio_inicial else 0
 
     @property
     def comision(self):
-        """Calcula la comisión del precio base."""
+        """Calcula la comisión del precio inicial."""
         return self.precio_inicial * 0.10 if self.precio_inicial else 0
 
     @property
@@ -38,23 +38,22 @@ class Subasta(models.Model):
         return self.estado == 'vigente' and timezone.now() > self.fecha_termino
 
     def recalcular_precio_subasta(self, monto=None):
-        """Recalcula el precio_subasta con base en el monto actual."""
+        """Recalcula el precio_subasta basado en el monto actual o inicial."""
         monto_base = monto if monto is not None else self.precio_inicial
         self.precio_subasta = monto_base + (monto_base * 0.19) + (monto_base * 0.10)
         self.save()
 
     def finalizar_subasta(self):
-        """Finaliza la subasta, calcula el precio final y cambia su estado."""
+        """Finaliza la subasta, calcula el precio final y cambia el estado."""
         puja_ganadora = self.puja_set.order_by('-monto').first()
         if puja_ganadora:
-            monto_final = puja_ganadora.monto
-            self.precio_final = monto_final + (monto_final * 0.19) + (monto_final * 0.10)
+            self.precio_final = puja_ganadora.monto  # Solo el monto puro de la puja
             self.estado = "pendiente"
             usuario_ganador = puja_ganadora.usuario_id
             if usuario_ganador and usuario_ganador.telefono:
                 self.enviar_notificacion_ganador(usuario_ganador.telefono)
         else:
-            self.precio_final = self.precio_subasta
+            self.precio_final = self.precio_inicial  # Si no hay pujas, queda el precio inicial
             self.estado = "cerrada"
         self.save()
 
@@ -85,6 +84,7 @@ class Subasta(models.Model):
     def actualizar_puja(self, monto):
         """Actualiza el precio_subasta según el monto actual de una nueva puja."""
         self.recalcular_precio_subasta(monto)
+
 
 @receiver(post_save, sender=Subasta)
 def verificar_estado_subasta(sender, instance, **kwargs):
