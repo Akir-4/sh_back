@@ -39,6 +39,7 @@ urlpatterns = [
     path('pagos/', include('pagos.urls')),
     path('generate-presigned-url/', generate_presigned_url, name='generate_presigned_url'),
     path('api/generate-presigned-url/', generate_presigned_url, name='generate_presigned_url'),
+    path('api/', include('comentarios.urls')),
 
 ]
 
