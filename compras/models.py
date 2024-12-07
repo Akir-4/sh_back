@@ -110,14 +110,16 @@ class Transaccion(models.Model):
     estado = models.CharField(max_length=20)
     fecha = models.DateTimeField(default=timezone.now)
     token_ws = models.CharField(max_length=100, blank=True, null=True)
-    monto = models.DecimalField(max_digits=10, decimal_places=2)
+    monto = models.DecimalField(max_digits=10, decimal_places=2)  # Precio final (monto total)
     iva = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     comision = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     envio = models.IntegerField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        """Calcula IVA y comisión al crear la transacción."""
-        if not self.pk:  # Solo calcular al crear
-            self.iva = self.monto * 0.19
-            self.comision = self.monto * 0.10
+        """Asocia IVA, comisión y monto desde la subasta al crear la transacción."""
+        if not self.pk:  # Solo al crear
+            subasta = self.puja_id.subasta_id
+            self.monto = subasta.precio_final  # El precio final ya incluye IVA y comisión
+            self.iva = subasta.precio_inicial * 0.19
+            self.comision = subasta.precio_inicial * 0.10
         super().save(*args, **kwargs)
