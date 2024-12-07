@@ -81,7 +81,7 @@ class Transaccion(models.Model):
     monto = models.IntegerField()
     iva = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     comision = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-
+    envio = models.IntegerField(null=True, blank=True)
     def save(self, *args, **kwargs):
         if not self.pk and self.monto:  # Solo calcular en el momento de crear una nueva transacción
             self.comision = self.monto * 0.10
