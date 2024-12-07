@@ -19,32 +19,53 @@ class Subasta(models.Model):
     ]
     estado = models.CharField(max_length=20, choices=ESTADO_OPCIONES, default='vigente')
     precio_inicial = models.IntegerField(null=True, blank=True)
-    precio_final = models.IntegerField(null=True, blank=True)
+    precio_subasta = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    precio_final = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+
+    @property
+    def iva(self):
+        """Calcula el IVA del precio base."""
+        return self.precio_inicial * 0.19 if self.precio_inicial else 0
+
+    @property
+    def comision(self):
+        """Calcula la comisión del precio base."""
+        return self.precio_inicial * 0.10 if self.precio_inicial else 0
 
     @property
     def sub_terminada(self):
+        """Verifica si la subasta ha terminado."""
         return self.estado == 'vigente' and timezone.now() > self.fecha_termino
 
+    def recalcular_precio_subasta(self, monto=None):
+        """Recalcula el precio_subasta con base en el monto actual."""
+        monto_base = monto if monto is not None else self.precio_inicial
+        self.precio_subasta = monto_base + (monto_base * 0.19) + (monto_base * 0.10)
+        self.save()
+
     def finalizar_subasta(self):
+        """Finaliza la subasta, calcula el precio final y cambia su estado."""
         puja_ganadora = self.puja_set.order_by('-monto').first()
         if puja_ganadora:
-            self.precio_final = puja_ganadora.monto
+            monto_final = puja_ganadora.monto
+            self.precio_final = monto_final + (monto_final * 0.19) + (monto_final * 0.10)
             self.estado = "pendiente"
-            # Enviar notificación al ganador
             usuario_ganador = puja_ganadora.usuario_id
             if usuario_ganador and usuario_ganador.telefono:
                 self.enviar_notificacion_ganador(usuario_ganador.telefono)
         else:
+            self.precio_final = self.precio_subasta
             self.estado = "cerrada"
-            self.precio_final = self.precio_inicial or 0
-        super().save()
+        self.save()
 
     def enviar_notificacion_ganador(self, telefono_ganador):
         """Envía una notificación de WhatsApp al ganador de la subasta."""
         client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-        mensaje = f"¡Hola! Felicidades, has ganado la subasta del producto '{self.producto_id.nombre}' con un precio final de ${self.precio_final} CLP. Ahora solo necesitas completar el pago. Ingresa a tu perfil para finalizar la compra. ¡Te felicitamos nuevamente!"
-
-        
+        mensaje = (
+            f"¡Hola! Felicidades, has ganado la subasta del producto '{self.producto_id.nombre}' "
+            f"con un precio final de ${self.precio_final:.2f} CLP. "
+            "Ingresa a tu perfil para completar el pago. ¡Felicidades nuevamente!"
+        )
         try:
             message = client.messages.create(
                 from_=settings.TWILIO_WHATSAPP_NUMBER,
@@ -56,12 +77,18 @@ class Subasta(models.Model):
             print(f"Error al enviar la notificación de WhatsApp: {e}")
 
     def save(self, *args, **kwargs):
-        if self.sub_terminada:
-            self.finalizar_subasta()
+        """Calcula precio_subasta al guardar una subasta."""
+        if not self.pk and self.precio_inicial:
+            self.recalcular_precio_subasta()
         super().save(*args, **kwargs)
+
+    def actualizar_puja(self, monto):
+        """Actualiza el precio_subasta según el monto actual de una nueva puja."""
+        self.recalcular_precio_subasta(monto)
 
 @receiver(post_save, sender=Subasta)
 def verificar_estado_subasta(sender, instance, **kwargs):
+    """Verifica el estado de la subasta después de guardar."""
     if instance.sub_terminada:
         instance.finalizar_subasta()
 
@@ -72,23 +99,25 @@ class Puja(models.Model):
     monto = models.IntegerField()
     fecha = models.DateTimeField()
 
+    def save(self, *args, **kwargs):
+        """Notifica a la subasta que actualice el precio_subasta cuando se crea una nueva puja."""
+        super().save(*args, **kwargs)
+        self.subasta_id.actualizar_puja(self.monto)
+
 class Transaccion(models.Model):
     transaccion_id = models.AutoField(primary_key=True)
     puja_id = models.ForeignKey(Puja, on_delete=models.CASCADE)
     estado = models.CharField(max_length=20)
     fecha = models.DateTimeField(default=timezone.now)
     token_ws = models.CharField(max_length=100, blank=True, null=True)
-    monto = models.IntegerField()
+    monto = models.DecimalField(max_digits=10, decimal_places=2)
     iva = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     comision = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     envio = models.IntegerField(null=True, blank=True)
+
     def save(self, *args, **kwargs):
-        if not self.pk and self.monto:  # Solo calcular en el momento de crear una nueva transacción
-            self.comision = self.monto * 0.10
+        """Calcula IVA y comisión al crear la transacción."""
+        if not self.pk:  # Solo calcular al crear
             self.iva = self.monto * 0.19
+            self.comision = self.monto * 0.10
         super().save(*args, **kwargs)
-        if self.estado == "completado":
-            subasta = self.puja_id.subasta_id
-            if subasta.estado == 'pendiente':
-                subasta.estado = "cerrada"
-                subasta.save()
