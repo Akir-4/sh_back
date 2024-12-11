@@ -713,7 +713,7 @@ class SubastaViewSet(viewsets.ModelViewSet):
         session_id = f"session-{subasta.subasta_id}"
 
         # URL a la cual Transbank redirigirá tras completar el pago
-        return_url = 'http://localhost:3000/confirmar-pago/'
+        return_url = 'https://shubik-shop-frontend-production.up.railway.app/confirmar-pago/'
 
         try:
             # Crear una instancia de Transaction
