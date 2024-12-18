@@ -699,9 +699,9 @@ class SubastaViewSet(viewsets.ModelViewSet):
 
         transaccion_pendiente = Transaccion.objects.filter(puja_id=puja_ganadora, estado="pendiente").first()
         if transaccion_pendiente:
-            # Aquí podrías decidir reiniciar la transacción si no ha sido completada
-            # Por ejemplo, cancelar la transacción anterior o permitir un nuevo intento
-            return Response({'error': 'Ya existe una transacción pendiente para esta subasta'}, status=status.HTTP_400_BAD_REQUEST)
+            # Marcar la transacción como cancelada antes de reiniciar
+            transaccion_pendiente.estado = "cancelada"
+            transaccion_pendiente.save()
 
         # Calcular IVA y comisión
         iva = puja_ganadora.monto * 0.19
