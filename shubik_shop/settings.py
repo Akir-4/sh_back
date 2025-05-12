@@ -121,7 +121,7 @@ WSGI_APPLICATION = 'shubik_shop.wsgi.application'
 #         'NAME': 'shubik',
 #         'USER': 'postgres',
 #         'PASSWORD': '1234',
-#         'HOST': '190.44.152.202',  # o la dirección de tu servidor de base de datos
+#         'HOST': '',  # o la dirección de tu servidor de base de datos
 #         'PORT': '5432',       # puerto por defecto de PostgreSQL
 #     }
 # }
